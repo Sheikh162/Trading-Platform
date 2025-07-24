@@ -1,7 +1,7 @@
-# Real-Time Cryptocurrency Exchange Platform
+# Real-Time Trading Platform
 
 ## Overview
-A full-stack cryptocurrency exchange platform featuring real-time order matching, live market data, and a professional trading interface. The system mimics platforms like Binance, with microservices for API, trading engine, WebSocket server, database, and a modern frontend.
+A full-stack trading platform featuring real-time order matching, live market data, and a professional trading interface. The system mimics platforms like Binance, with microservices for API, trading engine, WebSocket server, database, and a modern frontend.
 
 ## Features
 - Microservices architecture (API, Engine, WebSocket, DB, Frontend)
@@ -63,90 +63,4 @@ npm start
 ```
 
 #### Engine Service
-```bash
-cd engine
-npm install
-npm run build
-npm start
 ```
-
-#### WebSocket Service
-```bash
-cd ws
-npm install
-npm run build
-npm start
-```
-
-#### Database Service
-```bash
-cd db
-npm install
-npm run build
-npm start
-# (Optional) Seed DB:
-npm run seed:db
-```
-
-#### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-# or for production:
-npm run build && npm start
-```
-
-### 5. Access the Platform
-- **Frontend:** [http://localhost:3000](http://localhost:3000)
-- **API:** [http://localhost:PORT] (set in API service)
-- **WebSocket:** [ws://localhost:PORT] (set in ws service)
-
----
-
-## Troubleshooting
-- Ensure all services can connect to Redis and TimescaleDB (check ports and credentials).
-- If ports are in use, update them in the respective service configs.
-- Check logs for errors: `docker logs <container>` or service terminal output.
-- For CORS or proxy issues, verify frontend API/WebSocket URLs.
-
----
-
-## Project Structure
-- `api/` - REST API (Express.js)
-- `engine/` - Trading engine and order book
-- `ws/` - WebSocket server for real-time updates
-- `db/` - Database utilities and cron jobs
-- `frontend/` - Next.js trading UI
-- `docker/` - Docker Compose setup
-
----
-
-## Contributing
-Pull requests and issues are welcome!
-
----
-
-## License
-MIT (or specify your license) 
-
-# Deployment Checklist
-
-- [x] All sensitive data (passwords, API keys) are loaded from environment variables (e.g., `process.env.DB_PASSWORD`).
-- [x] All debug statements (`console.log`, etc.) are removed or commented out.
-- [x] All TODOs and FIXMEs are reviewed.
-- [x] `.gitignore` is present in the root and subprojects.
-- [x] LICENSE file is present.
-- [x] All dependencies are up to date and unused ones removed.
-- [x] All tests pass.
-
-## Environment Variables
-
-Set the following environment variables in your deployment environment:
-
-```
-DB_PASSWORD=your_database_password
-# Add other variables as needed
-```
-
-## For more details, see subproject READMEs. 

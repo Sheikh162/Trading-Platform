@@ -12,12 +12,12 @@ app.use(express.json());
 
 app.use("/api/v1/order", orderRouter);
 app.use("/api/v1/depth", depthRouter);
+app.use("/api/v1/klines", klineRouter);
+// write code for below 2
+app.use("/api/v1/tickers", tickersRouter);
 app.use("/api/v1/trades", tradesRouter);
-/* app.use("/api/v1/klines", klineRouter);
- */app.use("/api/v1/tickers", tickersRouter);
-
 
 app.listen(3000,'0.0.0.0',() => {
 });
 
-// 0.0.0.0 will broadcast therefore anyone connected to the same wifi who puts ip of the device and port instead of locahost will be able to send post request
+// 0.0.0.0 will broadcast therefore anyone connected to the same wifi who puts ip of the device and port instead of locahost will be able to send order via post request, so many people can test.

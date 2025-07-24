@@ -6,35 +6,80 @@ const pgClient = new Client({
     user: 'your_user',
     host: 'localhost',
     database: 'my_database',
-    password: process.env.DB_PASSWORD,
+    password: 'your_password',
     port: 5432,
 });
-pgClient.connect();
 
-async function main() {
-    const redisClient = createClient();
-    await redisClient.connect();
-    // console.log("connected to redis");
-
-    while (true) {
-        const response = await redisClient.rPop("db_processor" as string)
-        if (!response) {
-
-        }  else {
-            const data: DbMessage = JSON.parse(response);
-            if (data.type === "TRADE_ADDED") {
-                // console.log("adding data");
-                // console.log(data);
-                const price = data.data.price;
-                const timestamp = new Date(data.data.timestamp);
-                const query = 'INSERT INTO tata_prices (time, price) VALUES ($1, $2)';
-                // TODO: How to add volume?
-                const values = [timestamp, price];
-                await pgClient.query(query, values);
-            }
-        }
+async function connectToDatabase() {
+    try {
+        await pgClient.connect();
+        console.log('✅ Successfully connected to PostgreSQL database');
+    } catch (error) {
+        console.error('❌ Failed to connect to PostgreSQL:', error);
+        process.exit(1);
     }
-
 }
 
-main();
+async function main() {
+    console.log('🚀 Starting DB processor...');
+    await connectToDatabase();
+    
+    const redisClient = createClient();
+    
+    try {
+        await redisClient.connect();
+        console.log('✅ Successfully connected to Redis');
+    } catch (error) {
+        console.error('❌ Failed to connect to Redis:', error);
+        process.exit(1);
+    }
+
+    console.log('🔄 Starting to listen for messages from Redis queue "db_processor"...');
+    let messageCount = 0;
+
+    while (true) {
+        try {
+            const response = await redisClient.rPop("db_processor" as string);
+            if (!response) {
+                // Wait a bit before checking again to avoid busy waiting
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } else {
+                messageCount++;
+                console.log(`\n📨 Message #${messageCount} received from Redis queue`);
+                
+                const parsedResponse: DbMessage = JSON.parse(response);
+                console.log('📋 Message type:', parsedResponse.type);
+                
+                if (parsedResponse.type === "TRADE_ADDED") {
+                    const tradeData = parsedResponse.data;
+                    console.log('💰 Processing trade:');
+                    console.log('  - isBuyerMaker:', tradeData.isBuyerMaker);
+                    console.log('  - Trade ID:', tradeData.id);
+                    console.log('  - Market:', tradeData.market);
+                    console.log('  - Price:', tradeData.price);
+                    console.log('  - Quantity:', tradeData.quantity);
+                    console.log('  - Timestamp:', new Date(tradeData.timestamp).toISOString());
+                    
+                    const price = parseFloat(tradeData.price);
+                    const timestamp = new Date(tradeData.timestamp);
+                    const volume = parseFloat(tradeData.quantity);
+                    const query = 'INSERT INTO tata_prices (time, price,volume) VALUES ($1, $2, $3)';
+
+                    // simultaneously, run the cron.ts server
+                    
+                    const values = [timestamp, price, volume];
+                    await pgClient.query(query, values);
+                    
+                    console.log('✅ Trade data successfully inserted into database');
+                } else {
+                    console.log('ℹ️  Skipping message - not a TRADE_ADDED type');
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error processing message:', error);
+            // Continue processing other messages
+        }
+    }
+}
+
+main().catch(console.error);

@@ -15,13 +15,13 @@ interface UserBalance {
 }
 
 export class Engine {
-    private orderbooks: Orderbook[] = [];
-    private balances: Map<string, UserBalance> = new Map();
+    private orderbooks: Orderbook[] = []; // TATA_INR, APPLE_INR etc orderbook is basically like broker, who manages the 2 parties i.e the buyer and seller.
+    private balances: Map<string, UserBalance> = new Map(); // userid is key, userbalance interface is the value
 
     constructor() {
-        let snapshot = null
+        let snapshot = null  // snapshot is a JSON which consists of orderbooks(array of orderbook), and balances(array of balance of each user)
         try {
-            if (process.env.WITH_SNAPSHOT) {
+            if (process.env.WITH_SNAPSHOT) { // what does this mean?
                 snapshot = fs.readFileSync("./snapshot.json");
             }
         } catch (e) {
@@ -29,24 +29,24 @@ export class Engine {
         }
 
         if (snapshot) {
-            const snapshotSnapshot = JSON.parse(snapshot.toString());
-            this.orderbooks = snapshotSnapshot.orderbooks.map((o: any) => new Orderbook(o.baseAsset, o.bids, o.asks, o.lastTradeId, o.currentPrice));
-            this.balances = new Map(snapshotSnapshot.balances); // why are new objects being created
+            const parsedSnapshot = JSON.parse(snapshot.toString()); // why are we stringifyng it and parsing it again? because snapshot type is buffer?
+            this.orderbooks = parsedSnapshot.orderbooks.map((o: any) => new Orderbook(o.baseAsset, o.bids, o.asks, o.lastTradeId, o.currentPrice));
+            this.balances = new Map(parsedSnapshot.balances); // why are new objects being created
         } else {
             this.orderbooks = [new Orderbook(`TATA`, [], [], 0, 0)];
             this.setBaseBalances();
         }
-        setInterval(() => {
+        setInterval(() => { // why this? every 3 seconds, snapshot taken
             this.saveSnapshot();
         }, 1000 * 3);
     }
 
     saveSnapshot() {
-        const snapshotSnapshot = {
-            orderbooks: this.orderbooks.map(o => o.getSnapshot()),
-            balances: Array.from(this.balances.entries())
+        const toSnapshot = {
+            orderbooks: this.orderbooks.map(o => o.getOrderbookDetailsForSnapshot()),
+            balances: Array.from(this.balances.entries()) // uderstand the syntax later
         }
-        fs.writeFileSync("./snapshot.json", JSON.stringify(snapshotSnapshot));
+        fs.writeFileSync("./snapshot.json", JSON.stringify(toSnapshot));// while writing stringify, while reading parse(.tostring), since buffer while reading
     }
 
     process({ message, clientId }: {message: MessageFromApi, clientId: string}){
@@ -177,8 +177,6 @@ export class Engine {
         this.orderbooks.push(orderbook);
     }
 
-
-
     createOrder( {market, price, quantity, side, userId}:Extract<MessageFromApi, { type: typeof CREATE_ORDER }>["data"]) {
         const orderbook = this.orderbooks.find(o => o.ticker() === market)
         const baseAsset = market.split("_")[0];
@@ -200,13 +198,13 @@ export class Engine {
         }
         
         const { fills, executedQty } = orderbook.addOrder(order);
-        this.updateBalance(userId, baseAsset, quoteAsset, side, fills, executedQty);
+        this.updateBalance(userId, baseAsset, quoteAsset, side, fills, executedQty); // working ok i guess
         this.createDbTrades(fills, market, userId);
         this.updateDbOrders(order, executedQty, fills, market);
         //this.publishWsDepthUpdates(fills, price, side, market);
             // Publish depth update in TWO cases:
         if (fills.length > 0) {
-            // 1. If matches occurred - handled by matchBid/matchAsk
+            // 1. If matches occurred - handled by redis in matchBid/matchAsk
         } else {
             // 2. If no matches - new resting order
             this.publishRestingOrderUpdate(order, market);
@@ -216,39 +214,6 @@ export class Engine {
         return { executedQty, fills, orderId: order.orderId };
     }
     
-    publishRestingOrderUpdate(order: Order, market: string) {
-        const orderbook = this.orderbooks.find(o => o.ticker() === market);
-        if (!orderbook) return;
-    
-        const depth = orderbook.getDepth();
-        const priceStr = order.price.toString();
-    
-        if (order.side === "buy") {
-            const updatedBid = depth.bids.find(x => x[0] === priceStr) || 
-                             [priceStr, order.quantity.toString()];
-            
-            RedisManager.getInstance().publishMessage(`depth@${market}`, {
-                stream: `depth@${market}`,
-                data: {
-                    a: [], // No ask updates
-                    b: [updatedBid],
-                    e: "depth"
-                }
-            });
-        } else {
-            const updatedAsk = depth.asks.find(x => x[0] === priceStr) || 
-                             [priceStr, order.quantity.toString()];
-            
-            RedisManager.getInstance().publishMessage(`depth@${market}`, {
-                stream: `depth@${market}`,
-                data: {
-                    a: [updatedAsk],
-                    b: [], // No bid updates
-                    e: "depth"
-                }
-            });
-        }
-    }
     updateDbOrders(order: Order, executedQty: number, fills: Fill[], market: string) {
         RedisManager.getInstance().pushMessage({
             type: ORDER_UPDATE,
@@ -280,9 +245,9 @@ export class Engine {
                 data: {
                     market: market,
                     id: fill.tradeId.toString(),
-                    isBuyerMaker: fill.otherUserId === userId, // TODO: Is this right?
+                    isBuyerMaker: fill.otherUserId === userId, // TODO: Is this right? NO, NEED to make changes  to decide if the buyer caused the order to be filled or the seller
                     price: fill.price,
-                    quantity: fill.qty.toString(),
+                    quantity: fill.qty.toString(),// this pushes volume also
                     quoteQuantity: (fill.qty * Number(fill.price)).toString(),
                     timestamp: Date.now()
                 }
@@ -326,98 +291,39 @@ export class Engine {
         });
     }
 
-    publishWsDepthUpdates(fills: Fill[], price: string, side: "buy" | "sell", market: string) {
+    publishRestingOrderUpdate(order: Order, market: string) {
         const orderbook = this.orderbooks.find(o => o.ticker() === market);
         if (!orderbook) return;
-
+    
         const depth = orderbook.getDepth();
-        // console.log("Current depth:", depth);
-
-        if (side === "buy") {
-            // For BUY orders - update affected ASKS and the resting BID
-            const filledPrices = new Set(fills.map(f => f.price.toString()));
-            
-            const updatedAsks: [string, string][] = depth.asks
-                .map((ask: [string, string]) => {
-                    const [askPrice] = ask;
-                    return filledPrices.has(askPrice) 
-                        ? [askPrice, "0"] as [string, string]
-                        : ask;
-                })
-                .filter(ask => filledPrices.has(ask[0]));
-
-            const updatedBid = depth.bids.find(x => x[0] === price);
+        const priceStr = order.price.toString();
+    
+        if (order.side === "buy") {
+            const updatedBid = depth.bids.find(x => x[0] === priceStr) as [string,string]/*  || 
+                             [priceStr, order.quantity.toString()]; */ // trying to find the newly placed unmatched order
             
             RedisManager.getInstance().publishMessage(`depth@${market}`, {
                 stream: `depth@${market}`,
                 data: {
-                    a: updatedAsks,
-                    b: updatedBid ? [updatedBid] : [],
+                    a: [], // No ask updates
+                    b: [updatedBid],
                     e: "depth"
                 }
             });
         } else {
-            // For SELL orders - update affected BIDS and the resting ASK
-            const filledPrices = new Set(fills.map(f => f.price.toString()));
-            
-            const updatedBids: [string, string][] = depth.bids
-                .map((bid: [string, string]) => {
-                    const [bidPrice] = bid;
-                    return filledPrices.has(bidPrice)
-                        ? [bidPrice, "0"] as [string, string]
-                        : bid;
-                })
-                .filter(bid => filledPrices.has(bid[0]));
-
-            const updatedAsk = depth.asks.find(x => x[0] === price);
+            const updatedAsk = depth.asks.find(x => x[0] === priceStr) || 
+                             [priceStr, order.quantity.toString()];
             
             RedisManager.getInstance().publishMessage(`depth@${market}`, {
                 stream: `depth@${market}`,
                 data: {
-                    a: updatedAsk ? [updatedAsk] : [],
-                    b: updatedBids,
+                    a: [updatedAsk],
+                    b: [], // No bid updates
                     e: "depth"
                 }
             });
         }
     }
-
-// control not reaching below    
-// the below one is used in createOrder fn
-/*     publishWsDepthUpdates(fills: Fill[], price: string, side: "buy" | "sell", market: string) { 
-        const orderbook = this.orderbooks.find(o => o.ticker() === market);
-        if (!orderbook) {
-            return;
-        }
-        const depth = orderbook.getDepth();
-        // console.log(depth)
-
-        if (side === "buy") { // below logic is only when there is a change i.e something filled, it is checked and then published to redis pubsub. because previous things should not be pushed again
-            const updatedAsks = depth?.asks.filter(x => fills.map(f => f.price).includes(x[0].toString()));
-            const updatedBid = depth?.bids.find(x => x[0] === price); // updatedBid is [price,qty]
-            RedisManager.getInstance().publishMessage(`depth@${market}`, {
-                stream: `depth@${market}`,
-                data: {
-                    a: updatedAsks,
-                    b: updatedBid ? [updatedBid] : [],
-                    e: "depth"
-                }
-            });
-
-        }
-        if (side === "sell") {
-           const updatedBids = depth?.bids.filter(x => fills.map(f => f.price).includes(x[0].toString()));
-           const updatedAsk = depth?.asks.find(x => x[0] === price);
-           RedisManager.getInstance().publishMessage(`depth@${market}`, {
-               stream: `depth@${market}`,
-               data: {
-                   a: updatedAsk ? [updatedAsk] : [],
-                   b: updatedBids,
-                   e: "depth"
-               }
-           });
-        }
-    } */
 
     updateBalance(userId: string, baseAsset: string, quoteAsset: string, side: "buy" | "sell", fills: Fill[], executedQty: number) {
         if (side === "buy") {
@@ -532,3 +438,100 @@ export class Engine {
     }
 
 }
+
+/*     publishWsDepthUpdates(fills: Fill[], price: string, side: "buy" | "sell", market: string) {
+        const orderbook = this.orderbooks.find(o => o.ticker() === market);
+        if (!orderbook) return;
+
+        const depth = orderbook.getDepth();
+        // console.log("Current depth:", depth);
+
+        if (side === "buy") {
+            // For BUY orders - update affected ASKS and the resting BID
+            const filledPrices = new Set(fills.map(f => f.price.toString())); // set of all prices from filled
+            
+             
+            // why this function didnt work ?
+            // because while checkung ask in fill, the fills were already processed i.e after order is matched, they are removed
+           
+            const updatedAsks: [string, string][] = depth.asks
+                .map((ask: [string, string]) => {
+                    const [askPrice,askQuantity] = ask;
+                    return filledPrices.has(askPrice) 
+                        ? [askPrice, "0"] as [string, string]
+                        : ask;
+                })
+                .filter(ask => filledPrices.has(ask[0]));
+
+            const updatedBid = depth.bids.find(x => x[0] === price);
+            
+            RedisManager.getInstance().publishMessage(`depth@${market}`, {
+                stream: `depth@${market}`,
+                data: {
+                    a: updatedAsks,
+                    b: updatedBid ? [updatedBid] : [],
+                    e: "depth"
+                }
+            });
+        } else {
+            // For SELL orders - update affected BIDS and the resting ASK
+            const filledPrices = new Set(fills.map(f => f.price.toString()));
+            
+            const updatedBids: [string, string][] = depth.bids
+                .map((bid: [string, string]) => {
+                    const [bidPrice] = bid;
+                    return filledPrices.has(bidPrice)
+                        ? [bidPrice, "0"] as [string, string]
+                        : bid;
+                })
+                .filter(bid => filledPrices.has(bid[0]));
+
+            const updatedAsk = depth.asks.find(x => x[0] === price);
+            
+            RedisManager.getInstance().publishMessage(`depth@${market}`, {
+                stream: `depth@${market}`,
+                data: {
+                    a: updatedAsk ? [updatedAsk] : [],
+                    b: updatedBids,
+                    e: "depth"
+                }
+            });
+        }
+    } */
+
+// control not reaching below    
+// the below one is used in createOrder fn
+/*     publishWsDepthUpdates(fills: Fill[], price: string, side: "buy" | "sell", market: string) { 
+        const orderbook = this.orderbooks.find(o => o.ticker() === market);
+        if (!orderbook) {
+            return;
+        }
+        const depth = orderbook.getDepth();
+        // console.log(depth)
+
+        if (side === "buy") { // below logic is only when there is a change i.e something filled, it is checked and then published to redis pubsub. because previous things should not be pushed again
+            const updatedAsks = depth?.asks.filter(x => fills.map(f => f.price).includes(x[0].toString()));
+            const updatedBid = depth?.bids.find(x => x[0] === price); // updatedBid is [price,qty]
+            RedisManager.getInstance().publishMessage(`depth@${market}`, {
+                stream: `depth@${market}`,
+                data: {
+                    a: updatedAsks,
+                    b: updatedBid ? [updatedBid] : [],
+                    e: "depth"
+                }
+            });
+
+        }
+        if (side === "sell") {
+           const updatedBids = depth?.bids.filter(x => fills.map(f => f.price).includes(x[0].toString()));
+           const updatedAsk = depth?.asks.find(x => x[0] === price);
+           RedisManager.getInstance().publishMessage(`depth@${market}`, {
+               stream: `depth@${market}`,
+               data: {
+                   a: updatedAsk ? [updatedAsk] : [],
+                   b: updatedBids,
+                   e: "depth"
+               }
+           });
+        }
+    } */

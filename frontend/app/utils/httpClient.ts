@@ -38,7 +38,7 @@ export async function getDepth(market: string): Promise<Depth> {
 }
 
 
-/* export async function getTrades(market: string): Promise<Trade[]> {
+export async function getTrades(market: string): Promise<Trade[]> {
     const response = await axios.get(PROXY_URL, {
         params: { endpoint: 'trades', symbol: market }
     });
@@ -62,7 +62,7 @@ export async function getKlines(
     });
     const data: KLine[] = response.data;
     return data.sort((x, y) => (Number(x.end) < Number(y.end) ? -1 : 1));
-} */
+}
 
 /* 
 export async function getTicker(market: string): Promise<Ticker> {

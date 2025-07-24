@@ -4,68 +4,91 @@ const client = new Client({
     user: 'your_user',
     host: 'localhost',
     database: 'my_database',
-    password: process.env.DB_PASSWORD,
+    password: 'your_password',
     port: 5432,
 });
 
 async function initializeDB() {
-    await client.connect();
+    try {
+        await client.connect();
+        console.log('✅ Connected to PostgreSQL database');
 
-    await client.query(`
-        DROP TABLE IF EXISTS "tata_prices";
-        CREATE TABLE "tata_prices"(
-            time            TIMESTAMP WITH TIME ZONE NOT NULL,
-            price   DOUBLE PRECISION,
-            volume      DOUBLE PRECISION,
-            currency_code   VARCHAR (10)
-        );
-        
-        SELECT create_hypertable('tata_prices', 'time', 'price', 2);
-    `);
+        // Drop materialized views first (they depend on the table)
+        console.log('🗑️ Dropping existing materialized views...');
+        await client.query(`
+            DROP MATERIALIZED VIEW IF EXISTS klines_1m CASCADE;
+            DROP MATERIALIZED VIEW IF EXISTS klines_1h CASCADE;
+            DROP MATERIALIZED VIEW IF EXISTS klines_1w CASCADE;
+        `);
 
-    await client.query(`
-        CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1m AS
-        SELECT
-            time_bucket('1 minute', time) AS bucket,
-            first(price, time) AS open,
-            max(price) AS high,
-            min(price) AS low,
-            last(price, time) AS close,
-            sum(volume) AS volume,
-            currency_code
-        FROM tata_prices
-        GROUP BY bucket, currency_code;
-    `);
+        // Now we can safely drop the table
+        console.log('🗑️ Dropping existing tata_prices table...');
+        await client.query('DROP TABLE IF EXISTS tata_prices CASCADE;');
 
-    await client.query(`
-        CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1h AS
-        SELECT
-            time_bucket('1 hour', time) AS bucket,
-            first(price, time) AS open,
-            max(price) AS high,
-            min(price) AS low,
-            last(price, time) AS close,
-            sum(volume) AS volume,
-            currency_code
-        FROM tata_prices
-        GROUP BY bucket, currency_code;
-    `);
+        // Create the table with volume support
+        console.log('🛠️ Creating new tata_prices table...');
+        await client.query(`
+            CREATE TABLE "tata_prices"(
+                time            TIMESTAMP WITH TIME ZONE NOT NULL,
+                price           DOUBLE PRECISION,
+                volume          DOUBLE PRECISION,
+                currency_code   VARCHAR(10) DEFAULT 'INR'
+            );
+            
+            SELECT create_hypertable('tata_prices', 'time', 'price', 2);
+        `);
 
-    await client.query(`
-        CREATE MATERIALIZED VIEW IF NOT EXISTS klines_1w AS
-        SELECT
-            time_bucket('1 week', time) AS bucket,
-            first(price, time) AS open,
-            max(price) AS high,
-            min(price) AS low,
-            last(price, time) AS close,
-            sum(volume) AS volume,
-            currency_code
-        FROM tata_prices
-        GROUP BY bucket, currency_code;
-    `);
+        // Recreate materialized views with volume aggregation
+        console.log('🔁 Creating materialized views...');
+        await client.query(`
+            CREATE MATERIALIZED VIEW klines_1m AS
+            SELECT
+                time_bucket('1 minute', time) AS bucket,
+                first(price, time) AS open,
+                max(price) AS high,
+                min(price) AS low,
+                last(price, time) AS close,
+                sum(volume) AS volume,
+                currency_code
+            FROM tata_prices
+            GROUP BY bucket, currency_code;
+        `);
 
-    await client.end();
+        await client.query(`
+            CREATE MATERIALIZED VIEW klines_1h AS
+            SELECT
+                time_bucket('1 hour', time) AS bucket,
+                first(price, time) AS open,
+                max(price) AS high,
+                min(price) AS low,
+                last(price, time) AS close,
+                sum(volume) AS volume,
+                currency_code
+            FROM tata_prices
+            GROUP BY bucket, currency_code;
+        `);
+
+        await client.query(`
+            CREATE MATERIALIZED VIEW klines_1w AS
+            SELECT
+                time_bucket('1 week', time) AS bucket,
+                first(price, time) AS open,
+                max(price) AS high,
+                min(price) AS low,
+                last(price, time) AS close,
+                sum(volume) AS volume,
+                currency_code
+            FROM tata_prices
+            GROUP BY bucket, currency_code;
+        `);
+
+        console.log('✅ Database initialized successfully');
+    } catch (error) {
+        console.error('❌ Error initializing database:', error);
+        process.exit(1);
+    } finally {
+        await client.end();
+    }
 }
 
-initializeDB().catch(console.error);
+initializeDB();

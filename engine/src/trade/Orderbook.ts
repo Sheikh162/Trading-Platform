@@ -19,6 +19,7 @@ export interface Fill {
     markerOrderId: string;
 }
 
+// need to create a function which gets the current price
 export class Orderbook {
     bids: Order[];
     asks: Order[];
@@ -39,7 +40,7 @@ export class Orderbook {
         return `${this.baseAsset}_${this.quoteAsset}`;
     }
 
-    getSnapshot() {
+    getOrderbookDetailsForSnapshot() {
         return {
             baseAsset: this.baseAsset,
             bids: this.bids,
@@ -254,6 +255,36 @@ export class Orderbook {
             };
     }
 
+    getOpenOrders(userId: string): Order[] {
+        const asks = this.asks.filter(x => x.userId === userId);
+        const bids = this.bids.filter(x => x.userId === userId);
+        return [...asks, ...bids];
+    }
+
+    cancelBid(order: Order) {
+        const index = this.bids.findIndex(x => x.orderId === order.orderId);
+        if (index !== -1) {
+            const price = this.bids[index].price;
+            this.bids.splice(index, 1);
+            return price
+        }
+    }
+
+    cancelAsk(order: Order) {
+        const index = this.asks.findIndex(x => x.orderId === order.orderId);
+        if (index !== -1) {
+            const price = this.asks[index].price;
+            this.asks.splice(index, 1);
+            return price
+        }
+    }
+
+}
+
+/* 
+the current issue is when avail qty is 10 and i purchase 15, in frontend getting -ve values
+*/
+
 /*     matchBid(order: Order): {fills: Fill[], executedQty: number} {
         const fills: Fill[] = [];
         let executedQty = 0;
@@ -360,32 +391,3 @@ export class Orderbook {
             asks
         };
     } */
-    getOpenOrders(userId: string): Order[] {
-        const asks = this.asks.filter(x => x.userId === userId);
-        const bids = this.bids.filter(x => x.userId === userId);
-        return [...asks, ...bids];
-    }
-
-    cancelBid(order: Order) {
-        const index = this.bids.findIndex(x => x.orderId === order.orderId);
-        if (index !== -1) {
-            const price = this.bids[index].price;
-            this.bids.splice(index, 1);
-            return price
-        }
-    }
-
-    cancelAsk(order: Order) {
-        const index = this.asks.findIndex(x => x.orderId === order.orderId);
-        if (index !== -1) {
-            const price = this.asks[index].price;
-            this.asks.splice(index, 1);
-            return price
-        }
-    }
-
-}
-
-/* 
-the current issue is when avail qty is 10 and i purchase 15, in frontend getting -ve values
-*/

@@ -9,10 +9,12 @@ export type TickerUpdateMessage = {
         v?: string,
         V?: string,
         s?: string,
-        id: number,
+        //id: number,
         e: "ticker"
     }
 }
+
+// why do you need id for ticker here?
 
 export type DepthUpdateMessage = {
     stream: string,

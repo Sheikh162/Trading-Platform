@@ -3,12 +3,12 @@ import { createClient } from 'redis';
 import { DbMessage } from './types';
 
 const pgClient = new Client({
-    user: 'your_user',
-    host: 'localhost',
-    database: 'my_database',
-    password: 'your_password',
-    port: 5432,
-});
+    user: process.env.POSTGRES_USER,
+    host: process.env.POSTGRES_HOST,  // ✅ timescaledb when in Docker
+    database: process.env.POSTGRES_DB,
+    password: process.env.POSTGRES_PASSWORD,
+    port: Number(process.env.POSTGRES_PORT),
+  });
 
 async function connectToDatabase() {
     try {
@@ -24,7 +24,10 @@ async function main() {
     console.log('🚀 Starting DB processor...');
     await connectToDatabase();
     
-    const redisClient = createClient();
+    const redisUrl = process.env.REDIS_URL 
+    || `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`;
+
+    const redisClient = createClient({ url: redisUrl });
     
     try {
         await redisClient.connect();

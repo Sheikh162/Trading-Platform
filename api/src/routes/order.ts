@@ -1,12 +1,11 @@
 import { Router } from "express";
 import { RedisManager } from "../RedisManager";
-import { CREATE_ORDER, CANCEL_ORDER, ON_RAMP, GET_OPEN_ORDERS } from "../types";
+import { CREATE_ORDER, CANCEL_ORDER, ON_RAMP, GET_OPEN_ORDERS, GET_BALANCE } from "../types";
 
 export const orderRouter = Router();
 
 orderRouter.post("/", async (req, res) => {
     const { market, price, quantity, side, userId } = req.body;
-    //TODO: can u make the type of the response object right? Right now it is a union.  check in fromApi file in engine folder 
     const response = await RedisManager.getInstance().sendAndAwait({
         type: CREATE_ORDER,
         data: {
@@ -38,6 +37,16 @@ orderRouter.get("/open", async (req, res) => {
         data: {
             userId: req.query.userId as string,
             market: req.query.market as string
+        }
+    });
+    res.json(response.payload);
+});
+
+orderRouter.get("/balance", async (req, res) => {
+    const response = await RedisManager.getInstance().sendAndAwait({
+        type: GET_BALANCE,
+        data: {
+            userId: req.query.userId as string,
         }
     });
     res.json(response.payload);

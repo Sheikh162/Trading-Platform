@@ -1,12 +1,12 @@
 const { Client } = require('pg');
 
 const client = new Client({
-    user: 'your_user',
-    host: 'localhost',
-    database: 'my_database',
-    password: 'your_password',
-    port: 5432,
-});
+    user: process.env.POSTGRES_USER,
+    host: process.env.POSTGRES_HOST,  // ✅ timescaledb when in Docker
+    database: process.env.POSTGRES_DB,
+    password: process.env.POSTGRES_PASSWORD,
+    port: Number(process.env.POSTGRES_PORT),
+  });
 
 async function initializeDB() {
     try {
@@ -91,4 +91,5 @@ async function initializeDB() {
     }
 }
 
+// run the seeding only once, not everytime i do docker compose up
 initializeDB();

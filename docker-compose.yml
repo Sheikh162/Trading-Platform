@@ -1,0 +1,155 @@
+# version: "3.9"
+
+services:
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT}:6379"
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg12
+    container_name: timescaledb
+    restart: unless-stopped
+    ports:
+      - "${TIMESCALE_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5    
+
+  api:
+    build:
+      context: ./api
+      #dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: api
+    command: npm run start
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      engine:
+        condition: service_started
+    ports:
+      - "${API_PORT}:3000"
+    env_file:
+      - ./api/.env
+
+  ws:
+    build:
+      context: ./ws
+      #dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: ws
+    command: npm run start
+    depends_on:
+      redis:
+        condition: service_started
+      engine:
+        condition: service_started
+    ports:
+      - "${WS_PORT}:3001"
+    env_file:
+      - ./ws/.env
+
+  engine:
+    build:
+      context: ./engine
+      #dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: engine
+    command: npm run start
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - ./engine/.env
+
+  db-seed:
+    build:
+      context: ./db
+      #dockerfile: Dockerfile
+    profiles: ["seed"]
+    container_name: db-seed
+    command: npm run db:seed
+    env_file:
+      - ./db/.env
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db-worker:
+    build:
+      context: ./db
+      #dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: db-worker
+    command: npm run start
+    env_file:
+      - ./db/.env
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db-cron:
+    build:
+      context: ./db
+      #dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: db-cron
+    command: npm run refresh:views
+    env_file:
+      - ./db/.env
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      #dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: frontend
+    ports:
+      - "${FRONTEND_PORT}:3002"
+    depends_on:
+      api:
+        condition: service_started
+      ws:
+        condition: service_started
+    env_file:
+      - ./frontend/.env
+
+  mm:
+    build:
+      context: ./mm
+      #dockerfile: Dockerfile
+    restart: unless-stopped
+    container_name: mm
+    command: npm run start
+    depends_on:
+      api:
+        condition: service_started
+    env_file:
+      - ./mm/.env
+      
+volumes:
+  timescale-data:

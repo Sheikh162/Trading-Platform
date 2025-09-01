@@ -19,21 +19,20 @@ export interface Fill {
     markerOrderId: string;
 }
 
-// need to create a function which gets the current price
 export class Orderbook {
     bids: Order[];
     asks: Order[];
     baseAsset: string;
     quoteAsset: string = BASE_CURRENCY;
     lastTradeId: number;
-    currentPrice: number;
+    tickerPrice: number; // this is frontend ticker
 
     constructor(baseAsset: string, bids: Order[], asks: Order[], lastTradeId: number, currentPrice: number) {
         this.bids = bids;
         this.asks = asks;
         this.baseAsset = baseAsset;
         this.lastTradeId = lastTradeId || 0;
-        this.currentPrice = currentPrice ||0;
+        this.tickerPrice = currentPrice ||0;
     }
 
     ticker() {
@@ -46,7 +45,7 @@ export class Orderbook {
             bids: this.bids,
             asks: this.asks,
             lastTradeId: this.lastTradeId,
-            currentPrice: this.currentPrice
+            currentPrice: this.tickerPrice
         }
     }
 
@@ -127,7 +126,9 @@ export class Orderbook {
                     otherUserId: ask.userId,
                     markerOrderId: ask.orderId
                 });
-    
+
+                this.tickerPrice = parseFloat(fills[fills.length - 1].price);
+                this.publishTickerPrice()
                 if (executedQty >= order.quantity) break;
             }
         }
@@ -184,7 +185,10 @@ export class Orderbook {
                     otherUserId: bid.userId,
                     markerOrderId: bid.orderId
                 });
-    
+
+                this.tickerPrice = parseFloat(fills[fills.length - 1].price);
+                this.publishTickerPrice()
+
                 if (executedQty >= order.quantity) break;
             }
         }
@@ -214,6 +218,24 @@ export class Orderbook {
     
         this.bids = this.bids.filter(bid => bid.filled < bid.quantity);
         return { fills, executedQty };
+    }
+
+    publishTickerPrice() {    
+        const tickerPrice=this.tickerPrice
+        const market=this.ticker()
+        RedisManager.getInstance().publishMessage(`ticker@${market}`, {
+            stream: `ticker@${market}`,
+            data: {
+                c: tickerPrice.toString(), // No ask updates
+/*                 h:"",
+                l:"",
+                v:"",
+                V:"", */
+                s:market,
+                //id: 123,
+                e: "ticker"
+            }
+        });
     }
 
     getDepth() {
@@ -280,114 +302,3 @@ export class Orderbook {
     }
 
 }
-
-/* 
-the current issue is when avail qty is 10 and i purchase 15, in frontend getting -ve values
-*/
-
-/*     matchBid(order: Order): {fills: Fill[], executedQty: number} {
-        const fills: Fill[] = [];
-        let executedQty = 0;
-
-        for (let i = 0; i < this.asks.length; i++) {
-            if (this.asks[i].userId!=order.userId && this.asks[i].price <= order.price && executedQty < order.quantity) {  // implemented self trade prevention
-                const filledQty = Math.min((order.quantity - executedQty), this.asks[i].quantity);
-                executedQty += filledQty;
-                this.asks[i].filled += filledQty;// shouldnt i decrement here
-                fills.push({
-                    price: this.asks[i].price.toString(),
-                    qty: filledQty,
-                    tradeId: this.lastTradeId++,
-                    otherUserId: this.asks[i].userId,
-                    markerOrderId: this.asks[i].orderId
-                });
-                console.log(fills)
-
-            }
-        }
-        for (let i = 0; i < this.asks.length; i++) {
-            if (this.asks[i].filled === this.asks[i].quantity) {
-                this.asks.splice(i, 1);
-                i--;
-            }
-        }
-        return {
-            fills,
-            executedQty
-        };
-    } */
-
-/*     matchAsk(order: Order): {fills: Fill[], executedQty: number} { //qty not changing issue
-        const fills: Fill[] = [];
-        let executedQty = 0;
-
-        for (let i = 0; i < this.bids.length; i++) {
-            if (this.bids[i].userId!=order.userId && this.bids[i].price >= order.price && executedQty < order.quantity) {
-                const amountRemaining = Math.min(order.quantity - executedQty, this.bids[i].quantity);
-                executedQty += amountRemaining;
-                this.bids[i].filled += amountRemaining;
-                fills.push({
-                    price: this.bids[i].price.toString(),
-                    qty: amountRemaining,
-                    tradeId: this.lastTradeId++,
-                    otherUserId: this.bids[i].userId,
-                    markerOrderId: this.bids[i].orderId
-                });
-            }
-        }
-        for (let i = 0; i < this.bids.length; i++) {
-            if (this.bids[i].filled === this.bids[i].quantity) {
-                this.bids.splice(i, 1);
-                i--;
-            }
-        }
-
-        return {
-            fills,
-            executedQty
-        };
-    } */
-
-    //TODO: Can you make this faster? Can you compute this during order matches?  using websockets??
-/*     getDepth() {  // something wrong here, not sending the latest data ,   soln!! ->  issue was we should return qty-fill not just qty
-        // here the order of orders returned diff then this.bids, asks fix it to match, use map instead because obj dont guarantee order
-        const bids: [string, string][] = [];
-        const asks: [string, string][] = [];
-
-        const bidsObj: {[key: string]: number} = {};
-        const asksObj: {[key: string]: number} = {};
-
-        for (let i = 0; i < this.bids.length; i++) {
-            const order = this.bids[i];
-            if (!bidsObj[order.price]) {
-                bidsObj[order.price] = 0;
-            }
-            if(order.quantity>order.filled){
-                bidsObj[order.price] += order.quantity-order.filled; //-ve val is coming
-            }
-        }
-
-        for (let i = 0; i < this.asks.length; i++) {
-            const order = this.asks[i];
-            if (!asksObj[order.price]) {
-                asksObj[order.price] = 0;
-            }
-            if(order.quantity>order.filled){
-                asksObj[order.price] += order.quantity-order.filled;
-            }
-        }
-
-        for (const price in bidsObj) {
-            bids.push([price, bidsObj[price].toString()]);
-        }
-
-        for (const price in asksObj) {
-            asks.push([price, asksObj[price].toString()]);
-        }
-        // why cant i just return from this.bids, asks? because frontend needs bids, asks in this format:  [string, string][]
-
-        return {
-            bids,
-            asks
-        };
-    } */

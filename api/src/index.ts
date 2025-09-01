@@ -17,7 +17,4 @@ app.use("/api/v1/klines", klineRouter);
 app.use("/api/v1/tickers", tickersRouter);
 app.use("/api/v1/trades", tradesRouter);
 
-app.listen(3000,'0.0.0.0',() => {
-});
-
-// 0.0.0.0 will broadcast therefore anyone connected to the same wifi who puts ip of the device and port instead of locahost will be able to send order via post request, so many people can test.
+app.listen(Number(process.env.PORT));

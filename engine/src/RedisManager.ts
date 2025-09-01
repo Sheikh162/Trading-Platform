@@ -32,7 +32,10 @@ export class RedisManager {
     private static instance: RedisManager;
 
     constructor() {
-        this.client = createClient();
+        const redisUrl = process.env.REDIS_URL 
+        || `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`;
+
+        this.client = createClient({ url: redisUrl });
         this.client.connect();
     }
 

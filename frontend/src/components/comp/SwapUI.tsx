@@ -18,7 +18,8 @@ const initialOrder = {
 export function SwapUI({ market }: { market: string }) {
   const [order, setOrder] = useState({ ...initialOrder, market });
   // Changed state to handle a string or null
-  const [balance, setBalance] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null); // also display how many tata stacks user has later
+
 
   const fetchBalance = async () => {
     try {

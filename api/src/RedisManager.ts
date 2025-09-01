@@ -6,14 +6,16 @@ export class RedisManager {
     private client: RedisClientType;
     private publisher: RedisClientType;
     private static instance: RedisManager;
-
     private constructor() {
-        this.client = createClient();
-        this.client.connect();
-        this.publisher = createClient();
-        this.publisher.connect();
-    }
+        const redisUrl = process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`;
 
+        this.client = createClient({ url: redisUrl });
+        this.publisher = createClient({ url: redisUrl });
+
+        // connect returns a Promise → don’t forget to await in init
+        this.client.connect().catch(console.error);
+        this.publisher.connect().catch(console.error);
+    }   
     public static getInstance() {
         if (!this.instance)  {
             this.instance = new RedisManager();
@@ -30,8 +32,7 @@ export class RedisManager {
             
             but why only pubsub, why not anything else here? need to find solution.
             */
-
-
+            
             const id = this.getRandomClientId();
             // below function is an event listener
             this.client.subscribe(id, (message) => { // id is the redis channel name, callback executes when result published

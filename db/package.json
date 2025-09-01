@@ -7,15 +7,19 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "npm run build && node dist/index.js",
-    "db:seed": "npm run build && node dist/seed-db.js",
-    "refresh:views": "npm run build && node dist/cron.js"
+    "db:seed": "node dist/seed-db.js",
+    "refresh:views": "node dist/cron.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/pg": "^8.11.6",
     "pg": "^8.12.0",
     "redis": "^4.6.14"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.6",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.5.0"
   }
 }

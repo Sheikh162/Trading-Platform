@@ -4,7 +4,10 @@ import { Engine } from "./trade/Engine";
 
 async function main() {
     const engine = new Engine(); 
-    const redisClient = createClient();
+    const redisUrl = process.env.REDIS_URL 
+    || `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`;
+
+    const redisClient = createClient({ url: redisUrl });
     await redisClient.connect();
 //messaging queue sends the ordes in fifo manner, synchronous
     while (true) {

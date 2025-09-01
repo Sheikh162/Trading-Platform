@@ -1,15 +1,15 @@
 import { Client } from 'pg';
 import { Router } from "express";
-import { RedisManager } from "../RedisManager";
 
 const pgClient = new Client({
-    user: 'your_user',
-    host: 'localhost',
-    database: 'my_database',
-    password: 'your_password',
-    port: 5432,
-});
-pgClient.connect();
+    user: process.env.POSTGRES_USER,
+    host: process.env.POSTGRES_HOST,  // ✅ timescaledb when in Docker
+    database: process.env.POSTGRES_DB,
+    password: process.env.POSTGRES_PASSWORD,
+    port: Number(process.env.POSTGRES_PORT),
+  });
+
+pgClient.connect()
 
 export const klineRouter = Router();
 
@@ -30,10 +30,11 @@ klineRouter.get("/", async (req, res) => {
         default:
             return res.status(400).send('Invalid interval');
     }
-
+    //console.log(query)
     try {
         //@ts-ignore
         const result = await pgClient.query(query, [new Date(startTime * 1000 as string), new Date(endTime * 1000 as string)]);
+        //console.log(result)
         res.json(result.rows.map(x => ({
             close: x.close,
             end: x.bucket,

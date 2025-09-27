@@ -7,3 +7,4 @@ tradesRouter.get("/", async (req, res) => {
     // get from DB
     res.json({});
 })
+//finish this later

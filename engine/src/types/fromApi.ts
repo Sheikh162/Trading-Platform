@@ -7,7 +7,6 @@ export const GET_DEPTH = "GET_DEPTH";
 export const GET_OPEN_ORDERS = "GET_OPEN_ORDERS";
 export const GET_BALANCE="GET_BALANCE"
 
-//TODO: Can we share the types between the api and the engine?
 export type MessageFromApi = {
     type: typeof CREATE_ORDER,
     data: {

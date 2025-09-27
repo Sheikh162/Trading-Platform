@@ -56,15 +56,12 @@ This project is fully containerized. Follow these steps to get all services up a
       ```
       *(Default values should work for most local setups.)*
 
-3. **Build and Run the Application**
+3. **Build the Application**
 
-    This command will build all service images and start the containers in the background.
+    This command will build all service images.
     ```bash
-    docker compose up -d --build
+    docker compose build
     ```
-
-    - `--build`: Forces Docker to build the images on the first run.
-    - `-d`: Runs the containers in detached mode (in the background).
 
 4. **Seed the Database (First-Time Setup)**
 
@@ -73,6 +70,14 @@ This project is fully containerized. Follow these steps to get all services up a
     docker compose --profile seed up
     ```
     You only need to run this once when you first set up the project or whenever you want to reset the database.
+
+5. **Run the Application**
+
+    This command will start the containers in the background.
+    ```bash
+    docker compose up -d
+    ```
+    - `-d`: Runs the containers in detached mode (in the background).
 
 5. **Accessing the Services**
 
@@ -88,6 +93,6 @@ This project is fully containerized. Follow these steps to get all services up a
     ```
 
 ---
+## 📂 Project Architecture
 
-## 📂 Project Structure
-
+![Architecture Diagram](architecture.jpg)

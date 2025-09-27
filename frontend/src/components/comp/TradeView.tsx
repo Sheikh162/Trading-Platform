@@ -1,7 +1,8 @@
+import { ChartManager } from "@/src/lib/ChartManager";
+import { getKlines } from "@/src/lib/httpClient";
+import { KLine } from "@/src/lib/types";
 import { useEffect, useRef, useState } from "react";
-import { ChartManager } from "../../utils/ChartManager";
-import { getKlines } from "../../utils/httpClient";
-import { KLine } from "../../utils/types";
+
 
 // Helper function to format data
 const formatKlinesForChart = (klines: KLine[]) => {

@@ -25,7 +25,7 @@ export class Orderbook {
     baseAsset: string;
     quoteAsset: string = BASE_CURRENCY;
     lastTradeId: number;
-    tickerPrice: number; // this is frontend ticker
+    tickerPrice: number; //this is frontend ticker
 
     constructor(baseAsset: string, bids: Order[], asks: Order[], lastTradeId: number, currentPrice: number) {
         this.bids = bids;
@@ -58,13 +58,12 @@ export class Orderbook {
                     executedQty,
                     fills
                 }
-            }// changes needed here to priority of orders i.e bid price high means beginning of array i.e insert beg, if <= then push,  heap top 15 logic could also be valid
+            }
     
             if (this.bids.length==0 || order.price<=this.bids[this.bids.length-1].price) this.bids.push(order);
             else{
-                for(let i=0;i<this.bids.length;i++){ // try to find a faster way because tc is O(bids.length, which keeps changing)
+                for(let i=0;i<this.bids.length;i++){
                     if(order.price>this.bids[i].price){
-                        //console.log
                         this.bids.splice(i,0,order)
                         //console.log(this.bids)
                         break
@@ -85,9 +84,8 @@ export class Orderbook {
                 }
             }
             if (this.asks.length==0 || order.price>=this.asks[this.asks.length-1].price) this.asks.push(order);
-            else{// some issue here
-
-                for(let i=0;i<this.asks.length;i++){ // try to find a faster way because tc is O(bids.length, which keeps changing)
+            else{
+                for(let i=0;i<this.asks.length;i++){ 
                     if(order.price<this.asks[i].price){
                         this.asks.splice(i,0,order)
                         break
@@ -104,7 +102,7 @@ export class Orderbook {
     matchBid(order: Order): {fills: Fill[], executedQty: number} {
         const fills: Fill[] = [];
         let executedQty = 0;
-        const priceLevelChanges = new Map<string, number>(); // Tracks NET changes per price
+        const priceLevelChanges = new Map<string, number>();
     
         for (let i = 0; i < this.asks.length; i++) {
             const ask = this.asks[i];
@@ -115,7 +113,6 @@ export class Orderbook {
                 executedQty += fillableQty;
                 ask.filled += fillableQty;
     
-                // Track NET change per price level
                 const current = priceLevelChanges.get(ask.price.toString()) || 0;
                 priceLevelChanges.set(ask.price.toString(), current - fillableQty);
     
@@ -133,7 +130,6 @@ export class Orderbook {
             }
         }
     
-        // Generate accurate depth updates
         const affectedAsks: [string, string][] = [];
         priceLevelChanges.forEach((netChange, price) => {
             const currentDepthQty = this.asks
@@ -163,7 +159,7 @@ export class Orderbook {
     matchAsk(order: Order): {fills: Fill[], executedQty: number} {
         const fills: Fill[] = [];
         let executedQty = 0;
-        const priceLevelChanges = new Map<string, number>(); // Tracks NET changes per price
+        const priceLevelChanges = new Map<string, number>();
     
         for (let i = 0; i < this.bids.length; i++) {
             const bid = this.bids[i];
@@ -174,7 +170,6 @@ export class Orderbook {
                 executedQty += fillableQty;
                 bid.filled += fillableQty;
     
-                // Track NET change per price level
                 const current = priceLevelChanges.get(bid.price.toString()) || 0;
                 priceLevelChanges.set(bid.price.toString(), current - fillableQty);
     
@@ -193,7 +188,6 @@ export class Orderbook {
             }
         }
     
-        // Generate accurate depth updates
         const affectedBids: [string, string][] = [];
         priceLevelChanges.forEach((netChange, price) => {
             const currentDepthQty = this.bids
@@ -226,13 +220,13 @@ export class Orderbook {
         RedisManager.getInstance().publishMessage(`ticker@${market}`, {
             stream: `ticker@${market}`,
             data: {
-                c: tickerPrice.toString(), // No ask updates
-/*                 h:"",
-                l:"",
-                v:"",
-                V:"", */
-                s:market,
+                c: tickerPrice.toString(), 
+                // h:"",
+                // l:"",
+                // v:"",
+                // V:"",
                 //id: 123,
+                s:market,
                 e: "ticker"
             }
         });
@@ -242,7 +236,7 @@ export class Orderbook {
             const bids: [string, string][] = [];
             const asks: [string, string][] = [];
         
-            // Use Map to maintain insertion order
+            //using map specifically maintain insertion order
             const bidsMap = new Map<number, number>();
             const asksMap = new Map<number, number>();
         
@@ -262,7 +256,7 @@ export class Orderbook {
                 }
             }
         
-            // Convert Map to array - order will be preserved
+            //convert map to array
             bidsMap.forEach((value, price) => {
                 bids.push([price.toString(), value.toString()]);
             });

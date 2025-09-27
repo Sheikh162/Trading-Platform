@@ -1,4 +1,3 @@
-import { DEPTH_UPDATE, TICKER_UPDATE } from "./trade/events";
 import { RedisClientType, createClient } from "redis";
 import { ORDER_UPDATE, TRADE_ADDED } from "./types";
 import { WsMessage } from "./types/toWs";

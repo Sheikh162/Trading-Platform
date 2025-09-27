@@ -4,7 +4,6 @@ import { ORDER_UPDATE, TRADE_ADDED } from "../types/index";
 import { CANCEL_ORDER, CREATE_ORDER, GET_BALANCE, GET_DEPTH, GET_OPEN_ORDERS, MessageFromApi, ON_RAMP } from "../types/fromApi";
 import { Fill, Order, Orderbook } from "./Orderbook";
 
-//in future, avoid floats everywhere, use a decimal similar to the paytm project u did earlier
 export const BASE_CURRENCY = "INR";
 
 interface UserBalance {
@@ -13,8 +12,6 @@ interface UserBalance {
         locked: number;
     }
 }
-
-//whenever any type of modification happens to user balance, need to send to the user the account balance
 
 export class Engine {
     private orderbooks: Orderbook[] = []; // TATA_INR, APPLE_INR etc orderbook is basically like broker, who manages the 2 parties i.e the buyer and seller.
@@ -37,12 +34,12 @@ export class Engine {
         if (snapshot) {
             const parsedSnapshot = JSON.parse(snapshot.toString()); //  snapshot type is buffer, thats why we are stringifyng it and parsing it again
             this.orderbooks = parsedSnapshot.orderbooks.map((o: any) => new Orderbook(o.baseAsset, o.bids, o.asks, o.lastTradeId, o.currentPrice));
-            this.balances = new Map(parsedSnapshot.balances); // why are new objects being created
+            this.balances = new Map(parsedSnapshot.balances); 
         } else {
             this.orderbooks = [new Orderbook(`TATA`, [], [], 0, 0)];
             this.setBaseBalances();
         }
-        setInterval(() => { // why this? every 3 seconds, snapshot taken
+        setInterval(() => {
             this.saveSnapshot();
         }, 1000 * 3);
     }
@@ -66,15 +63,8 @@ export class Engine {
                             orderId,
                             executedQty,
                             fills,
-                            //clientId:this.balances[clientId]
                         }
                     });
-/*                     RedisManager.getInstance().sendToApi(clientId, { // this client id was sent from sendAndAwait fn in RedisManager api folder
-                        type: "ORDER_PLACED",
-                        payload: {
-                           userI:this.balances[clientId]
-                        }
-                    }); */
                 } catch (e) {
                     console.log(e);
                     RedisManager.getInstance().sendToApi(clientId, {
@@ -106,11 +96,11 @@ export class Engine {
                     if (order.side === "buy") {
                         const price = cancelOrderbook.cancelBid(order) // when order cancelled, refund has to be done
                         const leftQuantity = (order.quantity - order.filled) * order.price; 
-                        // subtracted since filled i.e executed qty cant be considered while cancelling,but why multiplying with price? is price per share or the total price? i feel per share
+                        // subtracted since filled i.e executed qty cant be considered while cancelling
                         //@ts-ignore
-                        this.balances.get(order.userId)[BASE_CURRENCY].available += leftQuantity;// this is the refund i guess
+                        this.balances.get(order.userId)[BASE_CURRENCY].available += leftQuantity;//refund ig
                         //@ts-ignore
-                        this.balances.get(order.userId)[BASE_CURRENCY].locked -= leftQuantity;// dont know what this
+                        this.balances.get(order.userId)[BASE_CURRENCY].locked -= leftQuantity;
                         if (price) {
                             this.sendUpdatedDepthAt(price.toString(), cancelMarket);
                         }
@@ -230,15 +220,15 @@ export class Engine {
         }
         
         const { fills, executedQty } = orderbook.addOrder(order);
-        this.updateBalance(userId, baseAsset, quoteAsset, side, fills, executedQty); // working ok i guess
+        this.updateBalance(userId, baseAsset, quoteAsset, side, fills, executedQty);
         this.createDbTrades(fills, market, userId);
-        this.updateDbOrders(order, executedQty, fills, market); // why am i calling this fn
-        //this.publishWsDepthUpdates(fills, price, side, market);
-            // Publish depth update in TWO cases:
+        this.updateDbOrders(order, executedQty, fills, market);
+        //this.publishWsDepthUpdates(fills, price, side, market);  implement later
+
         if (fills.length > 0) {
-            // 1. If matches occurred - handled by redis in matchBid/matchAsk
+            //if matches occurred, handled by redis in matchBid, matchAsk in orderbook file
         } else {
-            // 2. If no matches - new resting order
+            //when no matches, new resting order
             this.publishRestingOrderUpdate(order, market);
         }
     
@@ -253,7 +243,7 @@ export class Engine {
                 data: {
                     market: market,
                     id: fill.tradeId.toString(),
-                    isBuyerMaker: fill.otherUserId === userId, // TODO: Is this right? NO, NEED to make changes  to decide if the buyer caused the order to be filled or the seller
+                    isBuyerMaker: fill.otherUserId === userId, 
                     price: fill.price,
                     quantity: fill.qty.toString(),// this pushes volume also
                     quoteQuantity: (fill.qty * Number(fill.price)).toString(),
@@ -286,7 +276,6 @@ export class Engine {
             });
         });
     }
-    // 3 messages are sent to db_processor queue from the above 2 fns, find why 3 are needed.
     publishWsTrades(fills: Fill[], userId: string, market: string) {
         fills.forEach(fill => {
             RedisManager.getInstance().publishMessage(`trade@${market}`, {
@@ -294,7 +283,7 @@ export class Engine {
                 data: {
                     e: "trade",
                     t: fill.tradeId,
-                    m: fill.otherUserId === userId, // TODO: Is this right?
+                    m: fill.otherUserId === userId,
                     p: fill.price,
                     q: fill.qty.toString(),
                     s: market,
@@ -331,13 +320,12 @@ export class Engine {
         const priceStr = order.price.toString();
     
         if (order.side === "buy") {
-            const updatedBid = depth.bids.find(x => x[0] === priceStr) as [string,string]/*  || 
-                             [priceStr, order.quantity.toString()]; */ // trying to find the newly placed unmatched order
+            const updatedBid = depth.bids.find(x => x[0] === priceStr) as [string,string]
             
             RedisManager.getInstance().publishMessage(`depth@${market}`, {
                 stream: `depth@${market}`,
                 data: {
-                    a: [], // No ask updates
+                    a: [],
                     b: [updatedBid],
                     e: "depth"
                 }
@@ -350,7 +338,7 @@ export class Engine {
                 stream: `depth@${market}`,
                 data: {
                     a: [updatedAsk],
-                    b: [], // No bid updates
+                    b: [],
                     e: "depth"
                 }
             });
@@ -366,23 +354,22 @@ export class Engine {
         RedisManager.getInstance().publishMessage(`ticker@${market}`, {
             stream: `ticker@${market}`,
             data: {
-                c: tickerPrice.toString(), // No ask updates
-/*                 h:"",
-                l:"",
-                v:"",
-                V:"", */
-                s:market,
+                c: tickerPrice.toString(),
+                // h:"",
+                // l:"",
+                // v:"",
+                // V:"",
                 //id: 123,
+                s:market,
                 e: "ticker"
             }
         });
     }
-
     // similar to the above, make for currentprice i.e ticker price
 
     updateBalance(userId: string, baseAsset: string, quoteAsset: string, side: "buy" | "sell", fills: Fill[], executedQty: number) {
         if (side === "buy") {
-            fills.forEach(fill => {// not understood this logic
+            fills.forEach(fill => {
                 // Update quote asset balance
                 //@ts-ignore
                 this.balances.get(fill.otherUserId)[quoteAsset].available = this.balances.get(fill.otherUserId)?.[quoteAsset].available + (fill.qty * fill.price);
@@ -423,7 +410,7 @@ export class Engine {
 
     checkAndLockFunds(baseAsset: string, quoteAsset: string, side: "buy" | "sell", userId: string, asset: string, price: string, quantity: string) {
         if (side === "buy") {
-            if ((this.balances.get(userId)?.[quoteAsset]?.available || 0) < Number(quantity) * Number(price)) { // price here is per unit
+            if ((this.balances.get(userId)?.[quoteAsset]?.available || 0) < Number(quantity) * Number(price)) { // price here is per unit stock
                 throw new Error("Insufficient funds");
             }
             //@ts-ignore

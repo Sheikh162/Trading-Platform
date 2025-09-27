@@ -1,5 +1,3 @@
-//TODO: Can we share the types between the ws layer and the engine?
-
 export type TickerUpdateMessage = {
     stream: string, 
     data: {
@@ -13,8 +11,6 @@ export type TickerUpdateMessage = {
         e: "ticker"
     }
 }
-
-// why do you need id for ticker here?
 
 export type DepthUpdateMessage = {
     stream: string,

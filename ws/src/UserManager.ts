@@ -7,7 +7,6 @@ export class UserManager {
     private users: Map<string, User> = new Map(); 
 
     private constructor() {
-        //nothing needed here
     }
 
     public static getInstance() {

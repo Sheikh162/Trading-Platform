@@ -8,10 +8,10 @@ const BUY_USER_ID = "2";
 const SELL_USER_ID = "5";
 let flag=false;
 
-/* async function waitForApi() {
+async function waitForApi() {
   while (true) {
     try {
-      await axios.get(`${BASE_URL}/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`); // or `/api/v1/order/open`
+      await axios.get(`${BASE_URL}/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`)
       flag=true
       console.log("API is up!");
       break;
@@ -20,10 +20,10 @@ let flag=false;
       await new Promise(r => setTimeout(r, 2000));
     }
   }
-} */
+}
 
 async function main() {
-    //if(!flag) await waitForApi();
+    if(!flag) await waitForApi();
     const price = 1000 + Math.random() * 10;
     const openOrders = await axios.get(`${BASE_URL}/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`); // why userId is passed? ig in order to know how many orders user has placed
 

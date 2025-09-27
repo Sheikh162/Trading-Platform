@@ -25,9 +25,9 @@ export function SwapUI({ market }: { market: string }) {
     try {
       const res = await axios.get(`http://localhost:3000/api/v1/order/balance?userId=${order.userId}`);
       setBalance(res.data.balance); // Directly sets the string value from the API
-      console.log("Balance updated 💰", res.data.balance);
+      console.log("Balance updated ", res.data.balance);
     } catch (err) {
-      console.error("Failed to fetch balance ❌", err);
+      console.error("Failed to fetch balance ", err);
       // Set a default string value on error
       setBalance("0"); 
     }
@@ -41,9 +41,9 @@ export function SwapUI({ market }: { market: string }) {
     try {
       const res = await axios.post("http://localhost:3000/api/v1/order", order);
       await fetchBalance();
-      console.log("Order placed ✅", res.data);
+      console.log("Order placed ", res.data);
     } catch (err) {
-      console.error("Order failed ❌", err);
+      console.error("Order failed ", err);
     }
   };
 

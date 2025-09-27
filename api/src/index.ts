@@ -13,8 +13,8 @@ app.use(express.json());
 app.use("/api/v1/order", orderRouter);
 app.use("/api/v1/depth", depthRouter);
 app.use("/api/v1/klines", klineRouter);
-// write code for below 2
-app.use("/api/v1/tickers", tickersRouter);
+// write code for below 2 later
+app.use("/api/v1/tickers", tickersRouter); //for this handled using websockets, so not needed using api
 app.use("/api/v1/trades", tradesRouter);
 
 app.listen(Number(process.env.PORT));

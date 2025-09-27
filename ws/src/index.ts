@@ -1,5 +1,5 @@
 import { WebSocketServer } from "ws";
-import { UserManager } from "./UserManager"; // UserManager class is a single instance , why? maybe because we only want a single object to manage for everyone, again why this?
+import { UserManager } from "./UserManager";
 
 const wss = new WebSocketServer({ port: Number(process.env.PORT) });
 wss.on("connection", (ws) => {

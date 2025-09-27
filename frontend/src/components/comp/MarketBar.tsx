@@ -1,14 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Ticker } from "../../utils/types";
-import { SignalingManager } from "../../utils/SignalingManager";
-import {
-  NavigationMenu,
-  NavigationMenuItem,
-  NavigationMenuList,
-  navigationMenuTriggerStyle,
-} from "@/src/components/ui/navigation-menu";
+
+import { SignalingManager } from "@/src/lib/SignalingManager";
+import { Ticker } from "@/src/lib/types";
 import { cn } from "@/src/lib/utils";
+import { NavigationMenu, NavigationMenuList, NavigationMenuItem } from "@radix-ui/react-navigation-menu";
+import { useState, useEffect } from "react";
+import { navigationMenuTriggerStyle } from "../ui/navigation-menu";
+
 
 export const MarketBar = ({ market }: { market: string }) => {
     const [ticker, setTicker] = useState<Ticker | null>(null);

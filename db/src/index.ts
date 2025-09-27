@@ -4,7 +4,7 @@ import { DbMessage } from './types';
 
 const pgClient = new Client({
     user: process.env.POSTGRES_USER,
-    host: process.env.POSTGRES_HOST,  // ✅ timescaledb when in Docker
+    host: process.env.POSTGRES_HOST,  
     database: process.env.POSTGRES_DB,
     password: process.env.POSTGRES_PASSWORD,
     port: Number(process.env.POSTGRES_PORT),
@@ -13,15 +13,15 @@ const pgClient = new Client({
 async function connectToDatabase() {
     try {
         await pgClient.connect();
-        console.log('✅ Successfully connected to PostgreSQL database');
+        console.log('Successfully connected to PostgreSQL database');
     } catch (error) {
-        console.error('❌ Failed to connect to PostgreSQL:', error);
+        console.error('Failed to connect to PostgreSQL:', error);
         process.exit(1);
     }
 }
 
 async function main() {
-    console.log('🚀 Starting DB processor...');
+    console.log(' Starting DB processor...');
     await connectToDatabase();
     
     const redisUrl = process.env.REDIS_URL 
@@ -31,31 +31,31 @@ async function main() {
     
     try {
         await redisClient.connect();
-        console.log('✅ Successfully connected to Redis');
+        console.log('Successfully connected to Redis');
     } catch (error) {
-        console.error('❌ Failed to connect to Redis:', error);
+        console.error('Failed to connect to Redis:', error);
         process.exit(1);
     }
 
-    console.log('🔄 Starting to listen for messages from Redis queue "db_processor"...');
+    console.log('Starting to listen for messages from Redis queue "db_processor"...');
     let messageCount = 0;
 
     while (true) {
         try {
             const response = await redisClient.rPop("db_processor" as string);
             if (!response) {
-                // Wait a bit before checking again to avoid busy waiting
+                // Wait a bit before checking again
                 await new Promise(resolve => setTimeout(resolve, 100));
             } else {
                 messageCount++;
-                console.log(`\n📨 Message #${messageCount} received from Redis queue`);
+                console.log(`\nMessage #${messageCount} received from Redis queue`);
                 
                 const parsedResponse: DbMessage = JSON.parse(response);
-                console.log('📋 Message type:', parsedResponse.type);
+                console.log('Message type:', parsedResponse.type);
                 
                 if (parsedResponse.type === "TRADE_ADDED") {
                     const tradeData = parsedResponse.data;
-                    console.log('💰 Processing trade:');
+                    console.log('Processing trade:');
                     console.log('  - isBuyerMaker:', tradeData.isBuyerMaker);
                     console.log('  - Trade ID:', tradeData.id);
                     console.log('  - Market:', tradeData.market);
@@ -73,13 +73,13 @@ async function main() {
                     const values = [timestamp, price, volume];
                     await pgClient.query(query, values);
                     
-                    console.log('✅ Trade data successfully inserted into database');
+                    console.log('Trade data successfully inserted into database');
                 } else {
-                    console.log('ℹ️  Skipping message - not a TRADE_ADDED type');
+                    console.log('Skipping message - not a TRADE_ADDED type');
                 }
             }
         } catch (error) {
-            console.error('❌ Error processing message:', error);
+            console.error('Error processing message:', error);
             // Continue processing other messages
         }
     }

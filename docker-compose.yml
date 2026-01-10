@@ -121,7 +121,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-
   frontend:
     build:
       context: ./frontend

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-import { ThemeProvider } from "../components/comp/theme-provider";
+import { ThemeProvider } from "../components/theme-provider";
 import { Navbar } from "@/src/components/comp/Navbar";
 import { cn } from "@/src/lib/utils";
 import { inter } from "./font";

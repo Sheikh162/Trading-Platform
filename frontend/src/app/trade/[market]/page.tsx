@@ -1,7 +1,7 @@
 "use client";
-import { MarketBar } from "@/src/components/comp/MarketBar";
-import { SwapUI } from "@/src/components/comp/SwapUI";
-import { TradeView } from "@/src/components/comp/TradeView";
+import { MarketBar } from "@/src/components/MarketBar";
+import { SwapUI } from "@/src/components/SwapUI";
+import { TradeView } from "@/src/components/TradeView";
 import { Depth } from "@/src/components/depth/Depth";
 import { useParams } from "next/navigation";
 

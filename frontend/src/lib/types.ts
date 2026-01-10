@@ -38,3 +38,17 @@ export interface Ticker {
     "trades": string,
     "volume": string
 }
+
+// Add this to frontend/src/lib/types.ts
+
+export interface Market {
+  id: string;
+  name: string;
+  symbol: string;
+  image: string;
+  price: number;
+  change24h: number;
+  volume24h: number;
+  marketCap: number;
+  priceHistory: number[];
+}

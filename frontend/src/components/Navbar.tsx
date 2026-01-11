@@ -11,12 +11,15 @@ import {
   navigationMenuTriggerStyle,
 } from "@/src/components/ui/navigation-menu";
 import { ThemeToggle } from "./ThemeToggle";
+import { LineComponent } from "./LineComponent";
 
 export const Navbar = () => {
     const route = usePathname();
-    const navLinks = [
-        { name: 'Trade', href: '/trade/TATA_INR' },
+const navLinks = [
+        { name: 'Dashboard', href: '/dashboard' },
+        { name: 'Portfolio', href: '/portfolio' },
         { name: 'Markets', href: '/markets' },
+        { name: 'Trade', href: '/trade/TATA_INR' }, 
     ];
 
     return (
@@ -25,7 +28,7 @@ export const Navbar = () => {
                 <div className="mr-4 flex items-center">
                     <Link href="/" className="mr-6 flex items-center space-x-2">
                         <span className="font-bold sm:inline-block">
-                            TradeMaxx
+                            Vertex
                         </span>
                     </Link>
                     <NavigationMenu className="hidden md:flex">
@@ -47,6 +50,7 @@ export const Navbar = () => {
                     <ThemeToggle />
                 </div>
             </div>
+            {/* <LineComponent/> */}
         </header>
     );
 }

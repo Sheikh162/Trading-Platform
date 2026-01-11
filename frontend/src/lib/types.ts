@@ -52,3 +52,50 @@ export interface Market {
   marketCap: number;
   priceHistory: number[];
 }
+
+
+export interface Order {
+    id: string;
+    market: string;
+    type: "LIMIT" | "MARKET";
+    side: "buy" | "sell";
+    price: string;
+    quantity: string;
+    filled: string;
+    status: "OPEN" | "FILLED" | "PARTIALLY_FILLED" | "CANCELLED" | "REJECTED";
+    timestamp: number; // Unix timestamp
+}
+
+// ... existing types (Market, Order, Ticker, etc.)
+
+export interface Asset {
+    symbol: string;
+    name: string;
+    balance: string;
+    value: string; // In fiat (e.g., INR)
+    avgBuyPrice: string;
+    unrealizedPnL: string; // "+20%" or "-5%"
+    unrealizedPnLValue: string; // "+₹500"
+    allocation: number; // Percentage 0-100
+    icon: string;
+}
+
+export interface Transaction {
+    id: string;
+    type: "DEPOSIT" | "WITHDRAWAL" | "TRADE_BUY" | "TRADE_SELL";
+    amount: string;
+    status: "COMPLETED" | "PENDING" | "FAILED";
+    timestamp: number;
+    details: string; // e.g. "UPI Ref: 123" or "Sold 10 TATA"
+}
+
+export interface DashboardStats {
+    totalBalance: string;
+    pnl24h: string;
+    pnl24hPercent: string;
+    openOrders: number;
+    bestPerformer: {
+        symbol: string;
+        change: string;
+    }
+}

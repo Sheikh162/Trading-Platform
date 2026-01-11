@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 import { ThemeProvider } from "../components/theme-provider";
-import { Navbar } from "@/src/components/comp/Navbar";
 import { cn } from "@/src/lib/utils";
 import { inter } from "./font";
-
+import { Navbar } from "../components/Navbar";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Trading Platform",
@@ -23,10 +23,9 @@ export default function RootLayout({
         className={cn(
           "min-h-screen bg-background font-sans text-foreground antialiased",
           inter.variable, 
-          //ibmPlexMono.variable
         )}
         >
-      <ThemeProvider
+        <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
@@ -34,7 +33,8 @@ export default function RootLayout({
           >
           <Navbar/>
           {children}
-        </ThemeProvider>
+          <Toaster/>
+       </ThemeProvider>
       </body>
     </html>
   );

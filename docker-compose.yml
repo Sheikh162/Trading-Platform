@@ -76,6 +76,8 @@ services:
         condition: service_started
     env_file:
       - ./engine/.env
+    volumes:
+      - ./engine/snapshot.json:/app/snapshot.json
 
   db-seed:
     build:

@@ -35,13 +35,15 @@ export class Engine {
             const parsedSnapshot = JSON.parse(snapshot.toString()); //  snapshot type is buffer, thats why we are stringifyng it and parsing it again
             this.orderbooks = parsedSnapshot.orderbooks.map((o: any) => new Orderbook(o.baseAsset, o.bids, o.asks, o.lastTradeId, o.currentPrice));
             this.balances = new Map(parsedSnapshot.balances); 
+            console.log(this.orderbooks)
+            console.log(this.balances)
         } else {
             this.orderbooks = [new Orderbook(`TATA`, [], [], 0, 0)];
             this.setBaseBalances();
         }
         setInterval(() => {
             this.saveSnapshot();
-        }, 1000 * 3);
+        }, 1000 * 5);
     }
 
     saveSnapshot() {

@@ -13,13 +13,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.2.3",
     "redis": "^4.6.14"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
     "@types/node": "^20.0.0",
     "@types/redis": "^4.0.11",
+    "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   }
 }
-

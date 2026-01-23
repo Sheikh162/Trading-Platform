@@ -37,6 +37,8 @@ WORKDIR /app
 
 # Install deps (with devDependencies for build)
 COPY package*.json ./
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 RUN npm ci
 
 # Copy all source and build Next.js app

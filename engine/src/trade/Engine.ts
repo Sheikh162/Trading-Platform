@@ -1,7 +1,7 @@
 import fs from "fs";
 import { RedisManager } from "../RedisManager";
 import { ORDER_UPDATE, TRADE_ADDED } from "../types/index";
-import { CANCEL_ORDER, CREATE_ORDER, GET_BALANCE, GET_DEPTH, GET_OPEN_ORDERS, MessageFromApi, ON_RAMP } from "../types/fromApi";
+import { CANCEL_ORDER, CREATE_ORDER, GET_BALANCE, GET_DEPTH, GET_OPEN_ORDERS, MessageFromApi, ON_RAMP, USER_CREATED } from "../types/fromApi";
 import { Fill, Order, Orderbook } from "./Orderbook";
 
 export const BASE_CURRENCY = "INR";
@@ -34,7 +34,7 @@ export class Engine {
         if (snapshot) {
             const parsedSnapshot = JSON.parse(snapshot.toString()); //  snapshot type is buffer, thats why we are stringifyng it and parsing it again
             this.orderbooks = parsedSnapshot.orderbooks.map((o: any) => new Orderbook(o.baseAsset, o.bids, o.asks, o.lastTradeId, o.currentPrice));
-            this.balances = new Map(parsedSnapshot.balances); 
+            this.balances = new Map(parsedSnapshot.balances);
             console.log(this.orderbooks)
             console.log(this.balances)
         } else {
@@ -54,8 +54,12 @@ export class Engine {
         fs.writeFileSync("./snapshot.json", JSON.stringify(toSnapshot));// while writing stringify, while reading parse(.tostring), since buffer while reading
     }
 
-    process({ message, clientId }: {message: MessageFromApi, clientId: string}){
+    process({ message, clientId }: { message: MessageFromApi, clientId: string }) {
         switch (message.type) {
+            case USER_CREATED:
+                this.createUser(message.data.userId);
+                console.log(this.balances)
+                break;
             case CREATE_ORDER:
                 try {
                     const { executedQty, fills, orderId } = this.createOrder(message.data);
@@ -97,7 +101,7 @@ export class Engine {
 
                     if (order.side === "buy") {
                         const price = cancelOrderbook.cancelBid(order) // when order cancelled, refund has to be done
-                        const leftQuantity = (order.quantity - order.filled) * order.price; 
+                        const leftQuantity = (order.quantity - order.filled) * order.price;
                         // subtracted since filled i.e executed qty cant be considered while cancelling
                         //@ts-ignore
                         this.balances.get(order.userId)[BASE_CURRENCY].available += leftQuantity;//refund ig
@@ -126,9 +130,9 @@ export class Engine {
                             remainingQty: 0
                         }
                     });
-                    
+
                 } catch (e) {
-                    console.log("Error hwile cancelling order", );
+                    console.log("Error hwile cancelling order",);
                     console.log(e);
                 }
                 break;
@@ -143,8 +147,8 @@ export class Engine {
                     RedisManager.getInstance().sendToApi(clientId, {
                         type: "OPEN_ORDERS",
                         payload: openOrders
-                    }); 
-                } catch(e) {
+                    });
+                } catch (e) {
                     console.log(e);
                 }
                 break;
@@ -175,9 +179,10 @@ export class Engine {
                     });
                 }
                 break;
-            case GET_BALANCE:
+            case GET_BALANCE: // need to fix this, why does this not return the money? it is in memory
                 try {
                     const userId = message.data.userId;
+                    console.log(userId)
                     const userBalance = this.balances.get(userId);
 
                     // Safely access the available balance of the BASE_CURRENCY (e.g., "INR").
@@ -189,19 +194,19 @@ export class Engine {
                         payload: {
                             balance: String(availableMoney) // Now sends only the number
                         }
-                    }); 
-                } catch(e) {
+                    });
+                } catch (e) {
                     console.log(e);
                 }
                 break;
-            }
+        }
     }
 
     addOrderbook(orderbook: Orderbook) {
         this.orderbooks.push(orderbook);
     }
 
-    createOrder( {market, price, quantity, side, userId}:Extract<MessageFromApi, { type: typeof CREATE_ORDER }>["data"]) {
+    createOrder({ market, price, quantity, side, userId }: Extract<MessageFromApi, { type: typeof CREATE_ORDER }>["data"]) {
         const orderbook = this.orderbooks.find(o => o.ticker() === market)
         const baseAsset = market.split("_")[0];
         const quoteAsset = market.split("_")[1];
@@ -220,7 +225,7 @@ export class Engine {
             side,
             userId
         }
-        
+
         const { fills, executedQty } = orderbook.addOrder(order);
         this.updateBalance(userId, baseAsset, quoteAsset, side, fills, executedQty);
         this.createDbTrades(fills, market, userId);
@@ -233,7 +238,7 @@ export class Engine {
             //when no matches, new resting order
             this.publishRestingOrderUpdate(order, market);
         }
-    
+
         this.publishWsTrades(fills, userId, market);
         return { executedQty, fills, orderId: order.orderId };
     }
@@ -245,7 +250,7 @@ export class Engine {
                 data: {
                     market: market,
                     id: fill.tradeId.toString(),
-                    isBuyerMaker: fill.otherUserId === userId, 
+                    isBuyerMaker: fill.otherUserId === userId,
                     price: fill.price,
                     quantity: fill.qty.toString(),// this pushes volume also
                     quoteQuantity: (fill.qty * Number(fill.price)).toString(),
@@ -303,7 +308,7 @@ export class Engine {
         const depth = orderbook.getDepth();
         const updatedBids = depth?.bids.filter(x => x[0] === price);
         const updatedAsks = depth?.asks.filter(x => x[0] === price);
-        
+
         RedisManager.getInstance().publishMessage(`depth@${market}`, {
             stream: `depth@${market}`,
             data: {
@@ -317,13 +322,13 @@ export class Engine {
     publishRestingOrderUpdate(order: Order, market: string) {
         const orderbook = this.orderbooks.find(o => o.ticker() === market);
         if (!orderbook) return;
-    
+
         const depth = orderbook.getDepth();
         const priceStr = order.price.toString();
-    
+
         if (order.side === "buy") {
-            const updatedBid = depth.bids.find(x => x[0] === priceStr) as [string,string]
-            
+            const updatedBid = depth.bids.find(x => x[0] === priceStr) as [string, string]
+
             RedisManager.getInstance().publishMessage(`depth@${market}`, {
                 stream: `depth@${market}`,
                 data: {
@@ -333,9 +338,9 @@ export class Engine {
                 }
             });
         } else {
-            const updatedAsk = depth.asks.find(x => x[0] === priceStr) || 
-                             [priceStr, order.quantity.toString()];
-            
+            const updatedAsk = depth.asks.find(x => x[0] === priceStr) ||
+                [priceStr, order.quantity.toString()];
+
             RedisManager.getInstance().publishMessage(`depth@${market}`, {
                 stream: `depth@${market}`,
                 data: {
@@ -350,8 +355,8 @@ export class Engine {
     publishTickerPrice(market: string) {
         const orderbook = this.orderbooks.find(o => o.ticker() === market);
         if (!orderbook) return;
-    
-        const tickerPrice=orderbook.tickerPrice
+
+        const tickerPrice = orderbook.tickerPrice
 
         RedisManager.getInstance().publishMessage(`ticker@${market}`, {
             stream: `ticker@${market}`,
@@ -362,7 +367,7 @@ export class Engine {
                 // v:"",
                 // V:"",
                 //id: 123,
-                s:market,
+                s: market,
                 e: "ticker"
             }
         });
@@ -388,7 +393,7 @@ export class Engine {
                 this.balances.get(userId)[baseAsset].available = this.balances.get(userId)?.[baseAsset].available + fill.qty;
 
             });
-            
+
         } else {
             fills.forEach(fill => {
                 // Update quote asset balance
@@ -417,7 +422,7 @@ export class Engine {
             }
             //@ts-ignore
             this.balances.get(userId)[quoteAsset].available = this.balances.get(userId)?.[quoteAsset].available - (Number(quantity) * Number(price));
-            
+
             //@ts-ignore
             this.balances.get(userId)[quoteAsset].locked = this.balances.get(userId)?.[quoteAsset].locked + (Number(quantity) * Number(price));
         } else {
@@ -426,7 +431,7 @@ export class Engine {
             }
             //@ts-ignore
             this.balances.get(userId)[baseAsset].available = this.balances.get(userId)?.[baseAsset].available - (Number(quantity));
-            
+
             //@ts-ignore
             this.balances.get(userId)[baseAsset].locked = this.balances.get(userId)?.[baseAsset].locked + Number(quantity);
         }
@@ -445,7 +450,7 @@ export class Engine {
             userBalance[BASE_CURRENCY].available += amount;
         }
     }
-    
+
     setBaseBalances() {
         this.balances.set("1", {
             [BASE_CURRENCY]: {
@@ -470,6 +475,19 @@ export class Engine {
         });
 
         this.balances.set("5", {
+            [BASE_CURRENCY]: {
+                available: 10000000,
+                locked: 0
+            },
+            "TATA": {
+                available: 10000000,
+                locked: 0
+            }
+        });
+    }
+
+    createUser(userId: string) {
+        this.balances.set(userId, {
             [BASE_CURRENCY]: {
                 available: 10000000,
                 locked: 0

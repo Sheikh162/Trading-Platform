@@ -127,6 +127,8 @@ services:
     build:
       context: ./frontend
       #dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
     restart: unless-stopped
     container_name: frontend
     ports:

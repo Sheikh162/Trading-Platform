@@ -2,7 +2,7 @@ import axios from "axios";
 import { NextRequest, NextResponse } from "next/server";
 
 //const BASE_URL = 'https://api.backpack.exchange/api/v1';
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL // make sure if the url has api or localhost
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

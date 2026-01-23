@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { WebSocketServer } from "ws";
 import { UserManager } from "./UserManager";
 

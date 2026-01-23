@@ -1,6 +1,7 @@
 import { Client } from 'pg';
 import { createClient } from 'redis';  
 import { DbMessage } from './types';
+import "dotenv/config";
 
 const pgClient = new Client({
     user: process.env.POSTGRES_USER,

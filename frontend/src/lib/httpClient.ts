@@ -1,6 +1,6 @@
 import axios from "axios";
 import { Depth, KLine, Ticker, Trade } from "./types";
-
+import { useAuth } from "@clerk/nextjs";
 
 /*
 the previous issue was sending it via this format: 

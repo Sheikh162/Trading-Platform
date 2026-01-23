@@ -42,7 +42,11 @@ export class RedisManager {
             //  always subscribe first, then publish
         });
     }
-
+    public pushMessage(message: MessageToEngine) {
+        // We use a static clientId because we don't expect a reply back to this specific request
+        this.publisher.lPush("messages", JSON.stringify({ clientId: "api_processor", message }));
+    }
+    
     public getRandomClientId() {
         return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     }

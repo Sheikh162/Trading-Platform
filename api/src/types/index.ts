@@ -3,10 +3,16 @@ export const CREATE_ORDER = "CREATE_ORDER";
 export const CANCEL_ORDER = "CANCEL_ORDER";
 export const ON_RAMP = "ON_RAMP";
 export const GET_OPEN_ORDERS = "GET_OPEN_ORDERS";
-export const GET_BALANCE="GET_BALANCE"
+export const GET_BALANCE = "GET_BALANCE"
 export const GET_DEPTH = "GET_DEPTH";
+export const USER_CREATED = "USER_CREATED";
 
 export type MessageFromOrderbook = {
+    type: "USER_CREATED",
+    payload: {
+        userId: string,
+    }
+} | {
     type: "DEPTH",
     payload: {
         market: string,
@@ -43,7 +49,7 @@ export type MessageFromOrderbook = {
         side: "buy" | "sell",
         userId: string
     }[]
-}|{
+} | {
     type: "GET_BALANCE",
     payload: {
         // orderId: string,

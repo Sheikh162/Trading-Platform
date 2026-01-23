@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/src/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
+import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
 
 const initialOrder = {
@@ -12,34 +13,52 @@ const initialOrder = {
   price: "",
   quantity: "",
   side: "buy",
-  userId: "1", // replace with Clerk/JWT userId later
 };
 
 export function SwapUI({ market }: { market: string }) {
+  const { userId, getToken } = useAuth(); // 2. Get the current user
   const [order, setOrder] = useState({ ...initialOrder, market });
   // Changed state to handle a string or null
   const [balance, setBalance] = useState<string | null>(null); // also display how many tata stacks user has later
 
 
   const fetchBalance = async () => {
+    if (!userId) return;
     try {
-      const res = await axios.get(`http://localhost:3000/api/v1/order/balance?userId=${order.userId}`);
+      const token = await getToken();
+      const res = await axios.get(`http://localhost:3000/api/v1/order/balance?userId=${userId}`,{
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+      }); // create this endpoint
       setBalance(res.data.balance); // Directly sets the string value from the API
       console.log("Balance updated ", res.data.balance);
     } catch (err) {
       console.error("Failed to fetch balance ", err);
       // Set a default string value on error
-      setBalance("0"); 
+      setBalance("0");
     }
   };
 
   useEffect(() => {
-    fetchBalance();
-  }, []);
+    // 4. Run this effect when the 'user' object loads or changes
+    if (userId) {
+        fetchBalance();
+    }
+  }, [userId]);
 
   const handleSubmit = async () => {
+    if (!userId) return;
     try {
-      const res = await axios.post("http://localhost:3000/api/v1/order", order);
+      const token = await getToken();
+      const res = await axios.post("http://localhost:3000/api/v1/order", {
+        ...order,
+        userId: userId
+      },{
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+      });
       await fetchBalance();
       console.log("Order placed ", res.data);
     } catch (err) {
@@ -99,9 +118,8 @@ function OrderPanel({ type, order, setOrder, onSubmit, balance }: any) {
       </div>
       <Button
         onClick={onSubmit}
-        className={`w-full ${
-          type === "buy" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
-        } text-white`}
+        className={`w-full ${type === "buy" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+          } text-white`}
       >
         {type === "buy" ? "Buy" : "Sell"}
       </Button>
@@ -114,7 +132,7 @@ function BalanceDisplay({ balance }: { balance: string | null }) {
   // Function to safely parse and format the balance string
   const formatBalance = (bal: string | null): string => {
     if (bal === null) return "Loading...";
-    
+
     const num = parseFloat(bal);
     // Check if the parsed number is valid, otherwise show 0.00
     return isNaN(num) ? "0.00" : num.toFixed(2);

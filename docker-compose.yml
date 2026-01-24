@@ -44,6 +44,10 @@ services:
       - "${API_PORT}:3000"
     env_file:
       - ./api/.env
+    environment:
+      # OVERRIDES: Connect to containers, not localhost
+      - POSTGRES_HOST=timescaledb
+      - REDIS_HOST=redis
 
   ws:
     build:
@@ -61,6 +65,9 @@ services:
       - "${WS_PORT}:3001"
     env_file:
       - ./ws/.env
+    environment:
+      # OVERRIDES
+      - REDIS_HOST=redis
 
   engine:
     build:
@@ -76,6 +83,12 @@ services:
         condition: service_started
     env_file:
       - ./engine/.env
+    environment:
+      # OVERRIDES
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
+      # We don't override DB here as Engine usually uses Redis, 
+      # but if it uses DB, add POSTGRES_HOST=timescaledb
     volumes:
       - ./engine/snapshot.json:/app/snapshot.json
 
@@ -88,6 +101,11 @@ services:
     command: npm run db:seed
     env_file:
       - ./db/.env
+    environment:
+      # OVERRIDES
+      - POSTGRES_HOST=timescaledb
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -103,6 +121,11 @@ services:
     command: npm run start
     env_file:
       - ./db/.env
+    environment:
+      # OVERRIDES
+      - POSTGRES_HOST=timescaledb
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -118,11 +141,17 @@ services:
     command: npm run refresh:views
     env_file:
       - ./db/.env
+    environment:
+      # OVERRIDES
+      - POSTGRES_HOST=timescaledb
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
     depends_on:
       timescaledb:
         condition: service_healthy
       redis:
         condition: service_started
+
   frontend:
     build:
       context: ./frontend
@@ -153,6 +182,10 @@ services:
         condition: service_started
     env_file:
       - ./mm/.env
+    environment:
+      # OVERRIDES
+      # MM running in Docker needs to talk to API container directly
+      - API_BASE_URL=http://api:3000
       
 volumes:
   timescale-data:

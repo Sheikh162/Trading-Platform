@@ -65,9 +65,15 @@ This project is fully containerized. Follow these steps to get all services up a
 
 4. **Seed the Database (First-Time Setup)**
 
-    To initialize the database with the necessary tables and materialized views, run the seed service using its profile:
+    Start the Database First, We need the DB running and "Healthy" before we can put data into it.
     ```bash
-    docker compose --profile seed up
+    docker compose up -d timescaledb redis
+    ```
+    (Wait ~10 seconds. You can run docker ps to see if timescaledb says healthy)
+
+    Run the Seeder, This runs the db-seed container once and then deletes it (--rm).
+    ```bash
+    docker compose --profile seed run --rm db-seed
     ```
     You only need to run this once when you first set up the project or whenever you want to reset the database.
 

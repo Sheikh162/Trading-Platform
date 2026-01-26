@@ -31,7 +31,7 @@ export function SwapUI({ market }: { market: string }) {
     try {
       const token = await getToken();
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/order/balance?userId=${userId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/order/balance?userId=${userId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -59,7 +59,7 @@ export function SwapUI({ market }: { market: string }) {
     try {
       const token = await getToken();
       const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/order`,
+        `${process.env.NEXT_PUBLIC_API_URL}/order`,
         {
           ...order,
           userId: userId,

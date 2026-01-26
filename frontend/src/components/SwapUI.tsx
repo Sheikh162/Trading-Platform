@@ -2,7 +2,12 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/src/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/src/components/ui/tabs";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { useAuth } from "@clerk/nextjs";
@@ -21,16 +26,18 @@ export function SwapUI({ market }: { market: string }) {
   // Changed state to handle a string or null
   const [balance, setBalance] = useState<string | null>(null); // also display how many tata stacks user has later
 
-
   const fetchBalance = async () => {
     if (!userId) return;
     try {
       const token = await getToken();
-      const res = await axios.get(`http://localhost:3000/api/v1/order/balance?userId=${userId}`,{
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-      }); // create this endpoint
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/order/balance?userId=${userId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
       setBalance(res.data.balance); // Directly sets the string value from the API
       console.log("Balance updated ", res.data.balance);
     } catch (err) {
@@ -43,7 +50,7 @@ export function SwapUI({ market }: { market: string }) {
   useEffect(() => {
     // 4. Run this effect when the 'user' object loads or changes
     if (userId) {
-        fetchBalance();
+      fetchBalance();
     }
   }, [userId]);
 
@@ -51,14 +58,18 @@ export function SwapUI({ market }: { market: string }) {
     if (!userId) return;
     try {
       const token = await getToken();
-      const res = await axios.post("http://localhost:3000/api/v1/order", {
-        ...order,
-        userId: userId
-      },{
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-      });
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/order`,
+        {
+          ...order,
+          userId: userId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
       await fetchBalance();
       console.log("Order placed ", res.data);
     } catch (err) {
@@ -71,20 +82,38 @@ export function SwapUI({ market }: { market: string }) {
       <CardHeader className="p-2">
         <Tabs defaultValue="buy" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="buy" onClick={() => setOrder({ ...order, side: "buy" })}>
+            <TabsTrigger
+              value="buy"
+              onClick={() => setOrder({ ...order, side: "buy" })}
+            >
               Buy
             </TabsTrigger>
-            <TabsTrigger value="sell" onClick={() => setOrder({ ...order, side: "sell" })}>
+            <TabsTrigger
+              value="sell"
+              onClick={() => setOrder({ ...order, side: "sell" })}
+            >
               Sell
             </TabsTrigger>
           </TabsList>
           <TabsContent value="buy">
             {/* Pass the string balance down as a prop */}
-            <OrderPanel type="buy" order={order} setOrder={setOrder} onSubmit={handleSubmit} balance={balance} />
+            <OrderPanel
+              type="buy"
+              order={order}
+              setOrder={setOrder}
+              onSubmit={handleSubmit}
+              balance={balance}
+            />
           </TabsContent>
           <TabsContent value="sell">
             {/* Pass the string balance down as a prop */}
-            <OrderPanel type="sell" order={order} setOrder={setOrder} onSubmit={handleSubmit} balance={balance} />
+            <OrderPanel
+              type="sell"
+              order={order}
+              setOrder={setOrder}
+              onSubmit={handleSubmit}
+              balance={balance}
+            />
           </TabsContent>
         </Tabs>
       </CardHeader>
@@ -118,8 +147,11 @@ function OrderPanel({ type, order, setOrder, onSubmit, balance }: any) {
       </div>
       <Button
         onClick={onSubmit}
-        className={`w-full ${type === "buy" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
-          } text-white`}
+        className={`w-full ${
+          type === "buy"
+            ? "bg-green-600 hover:bg-green-700"
+            : "bg-red-600 hover:bg-red-700"
+        } text-white`}
       >
         {type === "buy" ? "Buy" : "Sell"}
       </Button>
@@ -141,9 +173,7 @@ function BalanceDisplay({ balance }: { balance: string | null }) {
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-muted-foreground">Available Balance (INR)</span>
-      <span className="font-medium">
-        {formatBalance(balance)}
-      </span>
+      <span className="font-medium">{formatBalance(balance)}</span>
     </div>
   );
 }

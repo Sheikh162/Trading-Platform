@@ -157,6 +157,7 @@ services:
       context: ./frontend
       #dockerfile: Dockerfile
       args:
+        NEXT_PUBLIC_API_URL: http://localhost:3000/api/v1
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
     restart: unless-stopped
     container_name: frontend
@@ -169,6 +170,8 @@ services:
         condition: service_started
     env_file:
       - ./frontend/.env
+    environment:
+      - HTTP_PROXY_URL=http://api:3000/api/v1
 
   mm:
     build:

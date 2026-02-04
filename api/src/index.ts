@@ -15,7 +15,7 @@ app.use(cors());
 app.use("/api/v1/webhooks", webhookRouter);
 
 app.use(express.json());
-app.use(clerkMiddleware())
+app.use(clerkMiddleware());
 
 app.use("/api/v1/order", orderRouter);
 app.use("/api/v1/depth", depthRouter);

@@ -1,31 +1,37 @@
 # ---- Build stage ----
-    FROM node:20-alpine AS builder
-    WORKDIR /app
-    
-    # Install dependencies (dev included for build)
-    COPY package*.json ./
-    RUN npm ci
-    
-    # Copy source and build
-    COPY tsconfig*.json ./
-    COPY src ./src
-    RUN npm run build
-    
-    # ---- Run stage ----
-    FROM node:20-alpine AS runner
-    WORKDIR /app
-    ENV NODE_ENV=production
-    
-    # Install only prod dependencies
-    COPY package*.json ./
-    RUN npm ci --omit=dev
-    
-    # Copy built files from builder
-    COPY --from=builder /app/dist ./dist
-    
-    # API is hardcoded to port 3000 in src/index.ts
-    EXPOSE 3000
-    # Start the API server
-    CMD ["node", "dist/index.js"]
-    
-    
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# 1. Install pnpm
+RUN npm install -g pnpm
+
+# 2. Copy package files (Note: We copy pnpm-lock.yaml now)
+COPY package.json pnpm-lock.yaml ./
+
+# 3. Install dependencies (Equivalent to npm ci)
+RUN pnpm install --frozen-lockfile
+
+# Copy source and build
+COPY tsconfig*.json ./
+COPY src ./src
+RUN pnpm run build
+
+# ---- Run stage ----
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+# 1. Install pnpm
+RUN npm install -g pnpm
+
+# 2. Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# 3. Install only prod dependencies
+RUN pnpm install --prod
+
+# Copy built files
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 3000
+CMD ["node", "dist/index.js"]

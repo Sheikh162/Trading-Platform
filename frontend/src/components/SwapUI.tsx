@@ -25,13 +25,13 @@ export function SwapUI({ market }: { market: string }) {
   const [order, setOrder] = useState({ ...initialOrder, market });
   // Changed state to handle a string or null
   const [balance, setBalance] = useState<string | null>(null); // also display how many tata stacks user has later
-
+  // NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
   const fetchBalance = async () => {
     if (!userId) return;
     try {
       const token = await getToken();
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/order/balance?userId=${userId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/order/balance?userId=${userId}`, ///api/proxy?endpoint=order/balance&userId=${userId}
         {
           headers: {
             Authorization: `Bearer ${token}`,

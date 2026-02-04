@@ -1,89 +1,96 @@
-import { Client } from 'pg';
-import { createClient } from 'redis';  
-import { DbMessage } from './types';
+import { Client } from "pg";
+import { createClient } from "redis";
+import { DbMessage } from "./types";
 import "dotenv/config";
 
 const pgClient = new Client({
-    user: process.env.POSTGRES_USER,
-    host: process.env.POSTGRES_HOST,  
-    database: process.env.POSTGRES_DB,
-    password: process.env.POSTGRES_PASSWORD,
-    port: Number(process.env.POSTGRES_PORT),
-  });
+  user: process.env.POSTGRES_USER,
+  host: process.env.POSTGRES_HOST,
+  database: process.env.POSTGRES_DB,
+  password: process.env.POSTGRES_PASSWORD,
+  port: Number(process.env.POSTGRES_PORT),
+});
 
 async function connectToDatabase() {
-    try {
-        await pgClient.connect();
-        console.log('Successfully connected to PostgreSQL database');
-    } catch (error) {
-        console.error('Failed to connect to PostgreSQL:', error);
-        process.exit(1);
-    }
+  try {
+    await pgClient.connect();
+    console.log("Successfully connected to PostgreSQL database");
+  } catch (error) {
+    console.error("Failed to connect to PostgreSQL:", error);
+    process.exit(1);
+  }
 }
 
 async function main() {
-    console.log(' Starting DB processor...');
-    await connectToDatabase();
-    
-    const redisUrl = process.env.REDIS_URL 
-    || `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`;
+  console.log(" Starting DB processor...");
+  await connectToDatabase();
 
-    const redisClient = createClient({ url: redisUrl });
-    
+  const redisUrl =
+    process.env.REDIS_URL ||
+    `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`;
+
+  const redisClient = createClient({ url: redisUrl });
+
+  try {
+    await redisClient.connect();
+    console.log("Successfully connected to Redis");
+  } catch (error) {
+    console.error("Failed to connect to Redis:", error);
+    process.exit(1);
+  }
+
+  console.log(
+    'Starting to listen for messages from Redis queue "db_processor"...',
+  );
+  let messageCount = 0;
+
+  while (true) {
     try {
-        await redisClient.connect();
-        console.log('Successfully connected to Redis');
-    } catch (error) {
-        console.error('Failed to connect to Redis:', error);
-        process.exit(1);
-    }
+      const response = await redisClient.rPop("db_processor" as string);
+      if (!response) {
+        // Wait a bit before checking again
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } else {
+        messageCount++;
+        console.log(`\nMessage #${messageCount} received from Redis queue`);
 
-    console.log('Starting to listen for messages from Redis queue "db_processor"...');
-    let messageCount = 0;
+        const parsedResponse: DbMessage = JSON.parse(response);
+        console.log("Message type:", parsedResponse.type);
 
-    while (true) {
-        try {
-            const response = await redisClient.rPop("db_processor" as string);
-            if (!response) {
-                // Wait a bit before checking again
-                await new Promise(resolve => setTimeout(resolve, 100));
-            } else {
-                messageCount++;
-                console.log(`\nMessage #${messageCount} received from Redis queue`);
-                
-                const parsedResponse: DbMessage = JSON.parse(response);
-                console.log('Message type:', parsedResponse.type);
-                
-                if (parsedResponse.type === "TRADE_ADDED") {
-                    const tradeData = parsedResponse.data;
-                    console.log('Processing trade:');
-                    console.log('  - isBuyerMaker:', tradeData.isBuyerMaker);
-                    console.log('  - Trade ID:', tradeData.id);
-                    console.log('  - Market:', tradeData.market);
-                    console.log('  - Price:', tradeData.price);
-                    console.log('  - Quantity:', tradeData.quantity);
-                    console.log('  - Timestamp:', new Date(tradeData.timestamp).toISOString());
-                    
-                    const price = parseFloat(tradeData.price);
-                    const timestamp = new Date(tradeData.timestamp);
-                    const volume = parseFloat(tradeData.quantity);
-                    const query = 'INSERT INTO tata_prices (time, price,volume) VALUES ($1, $2, $3)';
+        if (parsedResponse.type === "TRADE_ADDED") {
+          const tradeData = parsedResponse.data;
+          console.log("Processing trade:");
+          console.log("  - isBuyerMaker:", tradeData.isBuyerMaker);
+          console.log("  - Trade ID:", tradeData.id);
+          console.log("  - Market:", tradeData.market);
+          console.log("  - Price:", tradeData.price);
+          console.log("  - Quantity:", tradeData.quantity);
+          console.log(
+            "  - Timestamp:",
+            new Date(tradeData.timestamp).toISOString(),
+          );
 
-                    // simultaneously, run the cron.ts server
-                    
-                    const values = [timestamp, price, volume];
-                    await pgClient.query(query, values);
-                    
-                    console.log('Trade data successfully inserted into database');
-                } else {
-                    console.log('Skipping message - not a TRADE_ADDED type');
-                }
-            }
-        } catch (error) {
-            console.error('Error processing message:', error);
-            // Continue processing other messages
+          const price = parseFloat(tradeData.price);
+          const timestamp = new Date(tradeData.timestamp);
+          const volume = parseFloat(tradeData.quantity);
+          const market = tradeData.market;
+
+          const query =
+            "INSERT INTO trades (time, price, volume, currency_code) VALUES ($1, $2, $3, $4)";
+          const values = [timestamp, price, volume, market];
+
+          await pgClient.query(query, values);
+
+          console.log("Trade data successfully inserted into database");
+        } else {
+          console.log("Skipping message - not a TRADE_ADDED type");
         }
+      }
+    } catch (error) {
+      console.error("Error processing message:", error);
+      // Continue processing other messages
     }
+  }
 }
 
 main().catch(console.error);

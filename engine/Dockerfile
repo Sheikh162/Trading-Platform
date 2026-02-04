@@ -1,35 +1,37 @@
-# Stage 1: Builder
+# ---- Build stage ----
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy package files first (better cache for deps)
-COPY package*.json ./
+# 1. Install pnpm
+RUN npm install -g pnpm
 
-# Install all deps (including dev for build)
-RUN npm ci
+# 2. Copy package files
+COPY package.json pnpm-lock.yaml ./
 
-# Copy source and config
+# 3. Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source and build
 COPY tsconfig.json ./
 COPY src ./src
+RUN pnpm run build
 
-# Build TypeScript → dist/
-RUN npm run build
-
-# Stage 2: Runner
+# ---- Run stage ----
 FROM node:20-alpine AS runner
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Copy only package files again
-COPY package*.json ./
+# 1. Install pnpm
+RUN npm install -g pnpm
 
-# Install only production dependencies
-RUN npm ci --omit=dev
+# 2. Copy package files
+COPY package.json pnpm-lock.yaml ./
 
-# Copy built JS from builder
+# 3. Install only prod dependencies
+RUN pnpm install --prod
+
+# Copy built files
 COPY --from=builder /app/dist ./dist
 
-# # Expose port (Express default 3000, adjust if needed)
-# EXPOSE 3000
-
-# Run app with env variable
-CMD ["sh", "-c", "WITH_SNAPSHOT=true node dist/index.js"]
+# Start the Engine
+CMD ["node", "dist/index.js"]

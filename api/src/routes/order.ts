@@ -47,12 +47,14 @@ orderRouter.get("/open", async (req, res) => {
 });
 
 orderRouter.get("/balance", async (req, res) => {
+    console.log("control check")
     const response = await RedisManager.getInstance().sendAndAwait({
         type: GET_BALANCE,
         data: {
             userId: req.query.userId as string,
         }
     });
+    console.log(response)
     res.json(response.payload);
 });
 

@@ -2,7 +2,7 @@ import express from "express";
 import { Webhook } from "svix";
 import bodyParser from "body-parser";
 import { RedisManager } from "../RedisManager";
-import 'dotenv/config'
+import "dotenv/config";
 //import { Client } from "pg"; // Ensure you have your DB client set up
 
 export const webhookRouter = express.Router();
@@ -66,7 +66,7 @@ webhookRouter.post(
       // --- ADD THESE LOGS ---
       console.log("❌ Webhook Verification Failed:");
       console.log("Error Message:", err.message);
-      console.log("Secret Used:", WEBHOOK_SECRET?.slice(0, 5) + "..."); 
+      console.log("Secret Used:", WEBHOOK_SECRET?.slice(0, 5) + "...");
       console.log("Payload Type:", typeof payload);
       // ----------------------
       return res.status(400).json({ message: "Verification failed" });
@@ -80,15 +80,15 @@ webhookRouter.post(
       try {
         // A. Create in Database (Postgres)
         //await db.query("INSERT INTO users (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING", [userId, email]);
-        
+
         // B. Notify Engine (Redis) - Fire and Forget!
         RedisManager.getInstance().pushMessage({
-            type: "USER_CREATED",
-            data: {
-                userId: userId 
-            }
+          type: "USER_CREATED",
+          data: {
+            userId: userId,
+          },
         });
-        
+
         console.log(`User ${userId} created and synced to Engine.`);
       } catch (e) {
         console.error("Error syncing user:", e);
@@ -98,6 +98,5 @@ webhookRouter.post(
     }
 
     return res.status(200).json({ message: "Webhook received" });
-  }
+  },
 );
-

@@ -1,45 +1,61 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.1450 0 0);
+  /* LIGHT MODE (Clean, high-contrast, institutional white) */
+  --background: oklch(0.99 0 0); /* Pure, clean white canvas */
+  --foreground: oklch(0.15 0 0); /* Deep charcoal text, not pure black */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.1450 0 0);
+  --card-foreground: oklch(0.15 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.1450 0 0);
-  --primary: oklch(0.2050 0 0);
-  --primary-foreground: oklch(0.9850 0 0);
-  --secondary: oklch(0.9700 0 0);
-  --secondary-foreground: oklch(0.2050 0 0);
-  --muted: oklch(0.9700 0 0);
-  --muted-foreground: oklch(0.5560 0 0);
-  --accent: oklch(0.9700 0 0);
-  --accent-foreground: oklch(0.2050 0 0);
-  --destructive: oklch(0.5770 0.2450 27.3250);
+  --popover-foreground: oklch(0.15 0 0);
+  
+  /* The "Money" Colors - Light Mode */
+  --primary: oklch(0.20 0 0); /* Deep Charcoal (Blackish) */
+  --primary-foreground: oklch(0.98 0 0); /* Crisp White Text */
+  --destructive: oklch(0.60 0.20 25); /* Crisp Apple Red (Ask/Down) */
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.9220 0 0);
-  --input: oklch(0.9220 0 0);
-  --ring: oklch(0.7080 0 0);
-  --chart-1: oklch(0.8100 0.1000 252);
-  --chart-2: oklch(0.6200 0.1900 260);
-  --chart-3: oklch(0.5500 0.2200 263);
-  --chart-4: oklch(0.4900 0.2200 264);
-  --chart-5: oklch(0.4200 0.1800 266);
-  --sidebar: oklch(0.9850 0 0);
-  --sidebar-foreground: oklch(0.1450 0 0);
-  --sidebar-primary: oklch(0.2050 0 0);
-  --sidebar-primary-foreground: oklch(0.9850 0 0);
-  --sidebar-accent: oklch(0.9700 0 0);
-  --sidebar-accent-foreground: oklch(0.2050 0 0);
-  --sidebar-border: oklch(0.9220 0 0);
-  --sidebar-ring: oklch(0.7080 0 0);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius: 0.625rem;
+  --success: oklch(0.65 0.15 150); /* Emerald Green (Bid/Up) */
+  --success-foreground: oklch(1 0 0);
+
+  /* Structure */
+  --secondary: oklch(0.96 0 0); /* Soft gray for hover states */
+  --secondary-foreground: oklch(0.20 0 0);
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.55 0 0); /* Crucial for secondary data */
+  --accent: oklch(0.96 0 0);
+  --accent-foreground: oklch(0.15 0 0);
+  
+  /* Borders (The 1px Rule) */
+  --border: oklch(0.90 0 0); /* Extremely subtle light gray */
+  --input: oklch(0.90 0 0);
+  --ring: oklch(0.20 0 0);
+
+  /* Charts */
+  --chart-1: oklch(0.20 0 0);
+  --chart-2: oklch(0.65 0.15 150);
+  --chart-3: oklch(0.80 0.10 80);
+  --chart-4: oklch(0.60 0.15 300);
+  --chart-5: oklch(0.70 0.15 40);
+
+  /* Sidebar */
+  --sidebar: oklch(0.98 0 0);
+  --sidebar-foreground: oklch(0.15 0 0);
+  --sidebar-primary: oklch(0.20 0 0);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.95 0 0);
+  --sidebar-accent-foreground: oklch(0.15 0 0);
+  --sidebar-border: oklch(0.90 0 0);
+  --sidebar-ring: oklch(0.20 0 0);
+
+  /* FONTS: Mapped to the Next.js variables from layout.tsx */
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: ui-serif, Georgia, serif; /* Fallback only */
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+  
+  /* Physics & Math */
+  --radius: 0.5rem; /* Standard SaaS slight curve */
   --shadow-x: 0;
   --shadow-y: 1px;
   --shadow-blur: 3px;
@@ -59,42 +75,57 @@
 }
 
 .dark {
-  --background: oklch(0.1450 0 0);
-  --foreground: oklch(0.9850 0 0);
-  --card: oklch(0.2050 0 0);
-  --card-foreground: oklch(0.9850 0 0);
-  --popover: oklch(0.2690 0 0);
-  --popover-foreground: oklch(0.9850 0 0);
-  --primary: oklch(0.9220 0 0);
-  --primary-foreground: oklch(0.2050 0 0);
-  --secondary: oklch(0.2690 0 0);
-  --secondary-foreground: oklch(0.9850 0 0);
-  --muted: oklch(0.2690 0 0);
-  --muted-foreground: oklch(0.7080 0 0);
-  --accent: oklch(0.3710 0 0);
-  --accent-foreground: oklch(0.9850 0 0);
-  --destructive: oklch(0.7040 0.1910 22.2160);
-  --destructive-foreground: oklch(0.9850 0 0);
-  --border: oklch(0.2750 0 0);
-  --input: oklch(0.3250 0 0);
-  --ring: oklch(0.5560 0 0);
-  --chart-1: oklch(0.8100 0.1000 252);
-  --chart-2: oklch(0.6200 0.1900 260);
-  --chart-3: oklch(0.5500 0.2200 263);
-  --chart-4: oklch(0.4900 0.2200 264);
-  --chart-5: oklch(0.4200 0.1800 266);
-  --sidebar: oklch(0.2050 0 0);
-  --sidebar-foreground: oklch(0.9850 0 0);
-  --sidebar-primary: oklch(0.4880 0.2430 264.3760);
-  --sidebar-primary-foreground: oklch(0.9850 0 0);
-  --sidebar-accent: oklch(0.2690 0 0);
-  --sidebar-accent-foreground: oklch(0.9850 0 0);
-  --sidebar-border: oklch(0.2750 0 0);
-  --sidebar-ring: oklch(0.4390 0 0);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius: 0.625rem;
+  /* DARK MODE (OLED Slate - High density, low eye strain) */
+  --background: oklch(0.18 0 0); /* #090A0C - Deep Charcoal, no blue tint */
+  --foreground: oklch(0.95 0 0); /* Off-white, prevents halation */
+  --card: oklch(0.22 0 0); /* #111318 - Slight elevation */
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.22 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+
+  /* The "Money" Colors - Dark Mode */
+  --primary: oklch(0.95 0 0); /* Crisp Off-White/Silver (Whitish) */
+  --primary-foreground: oklch(0.15 0 0); /* Deep Charcoal Text */
+  --destructive: oklch(0.65 0.22 25); /* Crisp Red (Ask/Down) */
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.70 0.15 150); /* Crisp Green (Bid/Up) */
+  --success-foreground: oklch(0.18 0 0); /* Dark text on green pill */
+
+  /* Structure */
+  --secondary: oklch(0.26 0 0); /* Deeper gray for UI panels */
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.26 0 0);
+  --muted-foreground: oklch(0.65 0 0); /* Muted labels, essential for data hierarchy */
+  --accent: oklch(0.26 0 0); /* Hover states */
+  --accent-foreground: oklch(0.95 0 0);
+  
+  /* Borders (The 1px Glass Rule) */
+  --border: oklch(0.28 0 0); /* Barely visible division lines */
+  --input: oklch(0.28 0 0);
+  --ring: oklch(0.95 0 0);
+
+  /* Charts */
+  --chart-1: oklch(0.95 0 0);
+  --chart-2: oklch(0.70 0.15 150);
+  --chart-3: oklch(0.70 0.15 80);
+  --chart-4: oklch(0.65 0.15 300);
+  --chart-5: oklch(0.65 0.15 40);
+
+  /* Sidebar */
+  --sidebar: oklch(0.20 0 0); /* Slightly lighter than canvas */
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.95 0 0);
+  --sidebar-primary-foreground: oklch(0.15 0 0);
+  --sidebar-accent: oklch(0.26 0 0);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.28 0 0);
+  --sidebar-ring: oklch(0.95 0 0);
+
+  /* Keep fonts and radius structurally identical */
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: ui-serif, Georgia, serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+  --radius: 0.5rem;
   --shadow-x: 0;
   --shadow-y: 1px;
   --shadow-blur: 3px;
@@ -128,6 +159,11 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  
+  /* EXPOSED CUSTOM COLORS FOR TRADING */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -162,4 +198,64 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  
+  /* CRITICAL: Enforce tabular numbers for financial data classes */
+  .tabular-data {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer utilities {
+  .glass-border {
+    @apply border border-white/10 dark:border-white/5;
+  }
+  
+  .glass-shadow-sm {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  .glass-shadow-md {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  }
+  
+  .glass-shadow-lg {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+  }
+  
+  .glass-bg {
+    @apply bg-white/5 dark:bg-black/20 backdrop-blur-xl;
+  }
+
+  .text-glow-white {
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+  }
+
+  @keyframes text-color-breathe {
+    0%, 100% { color: hsl(var(--muted-foreground)); text-shadow: none; }
+    50% { color: white; text-shadow: 0 0 12px rgba(255, 255, 255, 0.4); }
+  }
+  
+  .animate-text-color-breathe {
+    animation: text-color-breathe 4s ease-in-out infinite;
+  }
+  
+  @keyframes silver-foil-shimmer {
+    0% { background-position: 200% center; }
+    100% { background-position: -200% center; }
+  }
+  
+  .animate-silver-foil {
+    animation: silver-foil-shimmer 6s linear infinite;
+  }
 }

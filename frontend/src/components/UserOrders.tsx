@@ -45,16 +45,16 @@ export function UserOrders({ market }: { market: string }) {
         <div className="w-full h-full flex flex-col bg-card/20 border-t border-border">
             <Tabs defaultValue="open" className="w-full">
                 <div className="px-4 py-2 border-b border-border flex items-center">
-                    <TabsList className="bg-transparent h-8 p-0 gap-4">
+                    <TabsList className="bg-transparent h-8 p-0 gap-3">
                         <TabsTrigger 
                             value="open" 
-                            className="data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-2 text-xs text-muted-foreground transition-none"
+                            className="data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-2 text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground transition-none"
                         >
                             Open Orders
                         </TabsTrigger>
                         <TabsTrigger 
                             value="history" 
-                            className="mx-4 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-2 text-xs text-muted-foreground transition-none"
+                            className="data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-2 text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground transition-none"
                         >
                             Order History
                         </TabsTrigger>
@@ -81,7 +81,7 @@ function OrdersTable({ orders, onCancel, showAction = false }: { orders: Order[]
 
     return (
         <div className="w-full">
-            <div className="grid grid-cols-6 px-4 py-2 text-xs text-muted-foreground font-medium sticky top-0 bg-background/95 backdrop-blur z-10 border-b border-border">
+            <div className="grid grid-cols-6 px-3 py-[9px] text-[11px] font-light tracking-[0.05em] uppercase text-muted-foreground sticky top-0 bg-background/95 backdrop-blur z-10 border-b border-(--border)/30">
                 <div>Side</div>
                 <div>Price</div>
                 <div>Qty</div>
@@ -90,10 +90,10 @@ function OrdersTable({ orders, onCancel, showAction = false }: { orders: Order[]
                 {showAction && <div className="text-right">Action</div>}
             </div>
             {orders.map((order) => (
-                <div key={order.id} className="grid grid-cols-6 px-4 py-3 text-xs border-b border-border/50 hover:bg-muted/30 transition-colors items-center">
+                <div key={order.id} className="grid grid-cols-6 px-3 py-[9px] text-xs tabular-data border-b border-(--border)/30 hover:bg-muted/30 items-center">
                     <div className={cn(
-                        "font-medium uppercase",
-                        order.side === "buy" ? "text-green-500" : "text-red-500"
+                        "font-medium uppercase tracking-[0.05em]",
+                        order.side === "buy" ? "text-(--color-up)" : "text-(--color-down)"
                     )}>
                         {order.side}
                     </div>
@@ -107,7 +107,7 @@ function OrdersTable({ orders, onCancel, showAction = false }: { orders: Order[]
                             <Button 
                                 variant="ghost" 
                                 size="sm" 
-                                className="h-6 w-6 p-0 text-muted-foreground hover:text-red-500"
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                                 onClick={() => onCancel(order.id)}
                             >
                                 ✕

@@ -8,7 +8,10 @@ RUN npm install -g pnpm
 # Install deps
 COPY package.json pnpm-lock.yaml ./
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_API_URL
+
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile

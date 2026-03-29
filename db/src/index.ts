@@ -78,7 +78,6 @@ async function main() {
           const query =
             "INSERT INTO trades (time, price, volume, currency_code) VALUES ($1, $2, $3, $4)";
           const values = [timestamp, price, volume, market];
-
           await pgClient.query(query, values);
 
           console.log("Trade data successfully inserted into database");

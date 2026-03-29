@@ -47,32 +47,30 @@ orderRouter.get("/open", async (req, res) => {
 });
 
 orderRouter.get("/balance", async (req, res) => {
-    console.log("control check")
     const response = await RedisManager.getInstance().sendAndAwait({
         type: GET_BALANCE,
         data: {
             userId: req.query.userId as string,
         }
     });
-    console.log(response)
     res.json(response.payload);
 });
 
-orderRouter.post("/onramp", async (req, res) => {
-    //const { amount } = req.body;
-    const userId: string = req.userId as string
-    const txnId = getRandomClientId();
-    const response = await RedisManager.getInstance().sendAndAwait({
-        type: ON_RAMP,
-        data: {
-            amount: "10000000",
-            userId,
-            txnId
-        }
-    });
-    res.json(response.payload);
-});
+// orderRouter.post("/onramp", async (req, res) => {
+//     //const { amount } = req.body;
+//     const userId: string = req.userId as string
+//     const txnId = getRandomClientId();
+//     const response = await RedisManager.getInstance().sendAndAwait({
+//         type: ON_RAMP,
+//         data: {
+//             amount: "10000000",
+//             userId,
+//             txnId
+//         }
+//     });
+//     res.json(response.payload);
+// });
 
-function getRandomClientId() {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
+// function getRandomClientId() {
+//     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+// }

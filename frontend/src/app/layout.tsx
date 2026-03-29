@@ -1,12 +1,27 @@
+// For adding custom fonts with other frameworks, see:
+// https://tailwindcss.com/docs/font-family
 import type { Metadata } from "next";
+import { Geist, Lora, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-import { ThemeProvider } from "../components/theme-provider";
-import { cn } from "@/src/lib/utils";
-import { inter } from "./font";
-import { Navbar } from "../components/Navbar";
-import { Toaster } from "@/components/ui/sonner";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ThemeProvider } from "next-themes";
+import { Toaster } from "sonner";
+import { Navbar } from "../components/Navbar";
+
+const fontSans = Geist({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const fontSerif = Lora({
+  subsets: ["latin"],
+  variable: "--font-serif",
+});
+
+const fontMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
   title: "Trading Platform",
@@ -21,12 +36,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
     <html lang="en" suppressHydrationWarning>
-      <body 
-        className={cn(
-          "min-h-screen bg-background font-sans text-foreground antialiased",
-          inter.variable, 
-        )}
-        >
+      <body className={`${fontSans.variable} ${fontSerif.variable} ${fontMono.variable} antialiased`}>
         <ThemeProvider
             attribute="class"
             defaultTheme="dark"

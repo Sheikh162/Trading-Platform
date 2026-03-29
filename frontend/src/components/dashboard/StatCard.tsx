@@ -17,12 +17,11 @@ export function StatCard({ title, value, subValue, icon: Icon, trend }: StatCard
                 <Icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{value}</div>
+                <div className="text-2xl font-medium tabular-nums">{value}</div>
                 {subValue && (
-                    <p className={`text-xs mt-1 ${
-                        trend === 'up' ? 'text-green-500' : 
-                        trend === 'down' ? 'text-red-500' : 'text-muted-foreground'
-                    }`}>
+                    <p className={`text-xs mt-1 tabular-nums ${trend === 'up' ? 'text-[var(--color-up)]' :
+                        trend === 'down' ? 'text-[var(--color-down)]' : 'text-muted-foreground'
+                        }`}>
                         {subValue}
                     </p>
                 )}

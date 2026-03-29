@@ -6,7 +6,9 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
-  '/markets(.*)', // Added: Markets should be public
+  '/markets(.*)',
+  '/trade(.*)',
+  '/api/proxy(.*)',
   '/unauthorized',
 ])
 

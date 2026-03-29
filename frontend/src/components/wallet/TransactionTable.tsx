@@ -14,8 +14,8 @@ export function TransactionTable({ transactions }: { transactions: Transaction[]
                     </div>
                     <div className="text-right">
                         <div className={cn(
-                            "font-mono text-sm", 
-                            txn.type === 'DEPOSIT' || txn.type === 'TRADE_SELL' ? "text-green-500" : "text-foreground"
+                            "font-mono text-sm tabular-nums", 
+                            txn.type === 'DEPOSIT' || txn.type === 'TRADE_SELL' ? "text-[var(--color-up)]" : "text-foreground"
                         )}>
                             {txn.amount}
                         </div>

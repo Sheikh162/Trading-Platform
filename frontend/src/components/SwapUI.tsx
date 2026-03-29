@@ -12,6 +12,7 @@ import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
+import { getBalance } from "../lib/httpClient";
 
 const initialOrder = {
   market: "",
@@ -20,36 +21,28 @@ const initialOrder = {
   side: "buy",
 };
 
-export function SwapUI({ market }: { market: string }) {
+export function SwapUI({ market, initialBalance }: { market: string; initialBalance?: string | null }) {
   const { userId, getToken } = useAuth(); // 2. Get the current user
   const [order, setOrder] = useState({ ...initialOrder, market });
   // Changed state to handle a string or null
-  const [balance, setBalance] = useState<string | null>(null); // also display how many tata stacks user has later
-  // NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+  const [balance, setBalance] = useState<string | null>(initialBalance || null); // also display how many btc stacks user has later
+  
   const fetchBalance = async () => {
     if (!userId) return;
     try {
-      const token = await getToken();
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/order/balance?userId=${userId}`, ///api/proxy?endpoint=order/balance&userId=${userId}
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-      setBalance(res.data.balance); // Directly sets the string value from the API
-      console.log("Balance updated ", res.data.balance);
+      const token = (await getToken()) as string;
+      const balanceValue = await getBalance(userId, token);
+      setBalance(balanceValue);
+      console.log("Balance updated:", balanceValue);
     } catch (err) {
       console.error("Failed to fetch balance ", err);
-      // Set a default string value on error
       setBalance("0");
     }
   };
 
   useEffect(() => {
-    // 4. Run this effect when the 'user' object loads or changes
-    if (userId) {
+    // We already have initialBalance, so we only fetch again if balance is null
+    if (userId && balance === null) {
       fetchBalance();
     }
   }, [userId]);
@@ -58,8 +51,21 @@ export function SwapUI({ market }: { market: string }) {
     if (!userId) return;
     try {
       const token = await getToken();
+      // const res = await axios.post(
+      //   `${process.env.NEXT_PUBLIC_API_URL}/order`,
+      //   {
+      //     ...order,
+      //     userId: userId,
+      //   },
+      //   {
+      //     headers: {
+      //       Authorization: `Bearer ${token}`,
+      //     },
+      //   },
+      // );
+
       const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/order`,
+        `/api/proxy?endpoint=order`, 
         {
           ...order,
           userId: userId,
@@ -123,24 +129,26 @@ export function SwapUI({ market }: { market: string }) {
 
 function OrderPanel({ type, order, setOrder, onSubmit, balance }: any) {
   return (
-    <CardContent className="p-4 space-y-4">
+    <CardContent className="p-3 space-y-3">
       <BalanceDisplay balance={balance} />
-      <div className="space-y-2">
-        <Label htmlFor="price">Price</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="price" className="text-xs font-light tracking-[0.05em] uppercase text-muted-foreground">Price</Label>
         <Input
           id="price"
           placeholder="0.00"
           type="number"
+          className="tabular-nums"
           value={order.price}
           onChange={(e) => setOrder({ ...order, price: e.target.value })}
         />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="quantity">Quantity</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="quantity" className="text-xs font-light tracking-[0.05em] uppercase text-muted-foreground">Quantity</Label>
         <Input
           id="quantity"
           placeholder="0.00"
           type="number"
+          className="tabular-nums"
           value={order.quantity}
           onChange={(e) => setOrder({ ...order, quantity: e.target.value })}
         />
@@ -149,9 +157,9 @@ function OrderPanel({ type, order, setOrder, onSubmit, balance }: any) {
         onClick={onSubmit}
         className={`w-full ${
           type === "buy"
-            ? "bg-green-600 hover:bg-green-700"
-            : "bg-red-600 hover:bg-red-700"
-        } text-white`}
+            ? "bg-[color-mix(in_srgb,var(--color-up)_80%,transparent)] hover:bg-[var(--color-up)]"
+            : "bg-[color-mix(in_srgb,var(--color-down)_80%,transparent)] hover:bg-[var(--color-down)]"
+        } text-white transition-none`}
       >
         {type === "buy" ? "Buy" : "Sell"}
       </Button>
@@ -172,7 +180,7 @@ function BalanceDisplay({ balance }: { balance: string | null }) {
 
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-muted-foreground">Available Balance (INR)</span>
+      <span className="text-muted-foreground">Available Balance (USDT)</span>
       <span className="font-medium">{formatBalance(balance)}</span>
     </div>
   );

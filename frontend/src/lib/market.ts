@@ -36,15 +36,15 @@ const MOCK_MARKETS: Market[] = [
       priceHistory: [3300, 3320, 3350, 3380, 3400, 3420, 3410, 3430, 3450],
     },
     {
-        id: "TATA_INR",
-        name: "Tata Motors",
-        symbol: "TATA",
-        image: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
-        price: 980.00,
-        change24h: 0.5,
+        id: "BTC_USDT",
+        name: "Bitcoin",
+        symbol: "BTC",
+        image: "https://cryptologos.cc/logos/bitcoin-btc-logo.png",
+        price: 64230.5,
+        change24h: -1.2,
         volume24h: 15000000000,
         marketCap: 400000000000,
-        priceHistory: [970, 972, 975, 974, 978, 979, 980]
+        priceHistory: [64000, 64200, 64500, 64300, 64800, 64900, 64230]
     }
   ];
 

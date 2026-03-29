@@ -1,83 +1,46 @@
-import {Table,TableBody, TableRow, TableCell } from "@/src/components/ui/table";
+import { motion } from "motion/react";
+
+const SPRING_TICKER = { type: "spring", stiffness: 500, damping: 40 } as const;
 
 export const BidTable = ({ bids }: { bids: [string, string][] }) => {
     let currentTotal = 0;
-    const relevantBids = bids.slice(0, 15);
-    const bidsWithTotal: [string, string, number][] = relevantBids.map(([price, quantity]) => [price, quantity, currentTotal += Number(quantity)]);
+    const MAX_ROWS = 19;
+
+    const relevantBids = bids.slice(0, MAX_ROWS);
     const maxTotal = relevantBids.reduce((acc, [_, quantity]) => acc + Number(quantity), 0);
 
+    const bidsWithTotal: [string, string, number][] = relevantBids.map(([price, quantity]) => [price, quantity, currentTotal += Number(quantity)]);
+    
+    // Pad at the bottom to ensure exactly 19 elements total
+    const paddedCount = MAX_ROWS - bidsWithTotal.length;
+    const padding = Array.from({ length: paddedCount }).map((_, i) => <EmptyRow key={`empty-bid-${i}`} />);
+
     return (
-        <Table>
-            <TableBody>
-                {bidsWithTotal?.map(([price, quantity, total]) => (
-                    Number(quantity) !== 0 && <BidRow maxTotal={maxTotal} total={total} key={price} price={price} quantity={quantity} />
-                ))}
-            </TableBody>
-        </Table>
+        <div className="flex flex-col w-full">
+            {bidsWithTotal?.map(([price, quantity, total]) => (
+                Number(quantity) !== 0 && <BidRow maxTotal={maxTotal} total={total} key={price} price={price} quantity={quantity} />
+            ))}
+            {padding}
+        </div>
     );
+}
+
+function EmptyRow() {
+    return <div className="h-[22px] w-full" />;
 }
 
 function BidRow({ price, quantity, total, maxTotal }: { price: string, quantity: string, total: number, maxTotal: number }) {
     return (
-        <TableRow className="relative">
-            <TableCell className="absolute top-0 right-0 h-full bg-green-500/20"
-                style={{
-                    width: `${(100 * total) / maxTotal}%`,
-                    transition: "width 0.3s ease-in-out",
-                }}></TableCell>
-            <TableCell className="w-[100px] font-medium text-green-500">{price}</TableCell>
-            <TableCell>{quantity}</TableCell>
-            <TableCell className="text-right">{total.toFixed(2)}</TableCell>
-        </TableRow>
-    );
-}
-
-/* 
-export const BidTable = ({ bids }: {bids: [string, string][]}) => {
-    let currentTotal = 0; 
-    const relevantBids = bids.slice(0, 15);
-    const bidsWithTotal: [string, string, number][] = relevantBids.map(([price, quantity]) => [price, quantity, currentTotal += Number(quantity)]);
-    const maxTotal = relevantBids.reduce((acc, [_, quantity]) => acc + Number(quantity), 0);
-
-    return <div>
-        {bidsWithTotal?.map(([price, quantity, total]) => Number(quantity)!=0 && <Bid maxTotal={maxTotal} total={total} key={price} price={price} quantity={quantity} />)}
-    </div>
-}
-
-function Bid({ price, quantity, total, maxTotal }: { price: string, quantity: string, total: number, maxTotal: number }) {
-    return (
-        <div
-            style={{
-                display: "flex",
-                position: "relative",
-                width: "100%",
-                backgroundColor: "transparent",
-                overflow: "hidden",
-            }}
-        >
-        <div
-            style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: `${(100 * total) / maxTotal}%`,
-            height: "100%",
-            background: "rgba(1, 167, 129, 0.325)",
-            transition: "width 0.3s ease-in-out",
-            }}
-        ></div>
-            <div className={`flex justify-between text-xs w-full`}>
-                <div>
-                    {price}
-                </div>
-                <div>
-                    {quantity}
-                </div>
-                <div>
-                    {total.toFixed(2)}
-                </div>
-            </div>
+        <div className="relative grid grid-cols-3 px-4 h-[22px] items-center text-[13px] tabular-data hover:bg-muted/10 cursor-pointer overflow-hidden group">
+            <motion.div 
+                className="absolute top-0 right-0 h-full pointer-events-none bg-success/15 group-hover:bg-success/25"
+                initial={{ width: 0 }}
+                animate={{ width: `${(100 * total) / maxTotal}%` }}
+                transition={SPRING_TICKER}
+            />
+            <div className="text-left font-medium text-[var(--color-up)]">{price}</div>
+            <div className="text-right text-muted-foreground">{quantity}</div>
+            <div className="text-right">{total.toFixed(2)}</div>
         </div>
     );
 }
- */

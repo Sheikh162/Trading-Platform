@@ -93,12 +93,12 @@ const formatKlinesForChart = (klines: KLine[]) => {
   })).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 };
 
-export function TradeView({ market }: { market: string }) {
+export function TradeView({ market, initialData }: { market: string; initialData?: KLine[] }) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartManagerRef = useRef<ChartManager | null>(null);
-  const [klineData, setKLineData] = useState<KLine[]>([]);
+  const [klineData, setKLineData] = useState<KLine[]>(initialData || []);
 
-  // 1. Fetch Data
+  // 1. Fetch Data Interval
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -111,7 +111,10 @@ export function TradeView({ market }: { market: string }) {
       }
     };
 
-    fetchData();
+    // If we don't have initialData, fetch immediately. Otherwise just start interval.
+    if (klineData.length === 0) {
+      fetchData();
+    }
     const interval = setInterval(fetchData, 10_000);
     return () => clearInterval(interval);
   }, [market]);

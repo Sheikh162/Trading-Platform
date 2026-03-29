@@ -72,7 +72,7 @@ export interface Asset {
     symbol: string;
     name: string;
     balance: string;
-    value: string; // In fiat (e.g., INR)
+    value: string; // In fiat (e.g., USDT)
     avgBuyPrice: string;
     unrealizedPnL: string; // "+20%" or "-5%"
     unrealizedPnLValue: string; // "+₹500"

@@ -1,24 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react"; //
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkline } from "./Sparkline";
-import { getMarkets } from "../lib/market";
 import { Market } from "../lib/types";
 
-
-export const Markets = () => {
+export const Markets = ({ initialMarkets }: { initialMarkets: Market[] }) => {
   const router = useRouter();
-  const [markets, setMarkets] = useState<Market[]>([]); // Initialize state
-
-  // Fetch data on component mount
-  useEffect(() => {
-    const fetchMarkets = async () => {
-      const data = await getMarkets();
-      setMarkets(data);
-    };
-    fetchMarkets();
-  }, []);
+  const [markets, setMarkets] = useState<Market[]>(initialMarkets);
 
   const handleRowClick = (marketId: string) => {
     router.push(`/trade/${marketId}`);
@@ -42,7 +31,7 @@ export const Markets = () => {
   };
 
   return (
-    <div className="w-full bg-background border rounded-lg overflow-hidden">
+    <div className="w-full bg-background border rounded-none overflow-hidden">
       <table className="w-full text-sm text-left">
         <thead className="bg-muted/50 text-muted-foreground font-medium border-b">
           <tr>
@@ -58,7 +47,7 @@ export const Markets = () => {
           {/* Map over the 'markets' state instead of a constant */}
           {markets.map((market) => {
             const isPositive = market.change24h >= 0;
-            const color = isPositive ? "#22c55e" : "#ef4444"; 
+            const color = isPositive ? "var(--color-up)" : "var(--color-down)";
 
             return (
               <tr
@@ -75,22 +64,22 @@ export const Markets = () => {
                       className="w-8 h-8 rounded-full"
                     />
                     <div>
-                      <div className="font-semibold">{market.name}</div>
+                      <div className="font-medium">{market.name}</div>
                       <div className="text-xs text-muted-foreground">{market.symbol}</div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 font-medium">
+                <td className="px-6 py-4 font-medium tabular-data">
                   {formatCurrency(market.price)}
                 </td>
-                <td className={`px-6 py-4 ${isPositive ? "text-green-500" : "text-red-500"}`}>
+                <td className={`px-6 py-4 tabular-data ${isPositive ? "text-(--color-up)" : "text-(--color-down)"}`}>
                   {isPositive ? "+" : ""}
                   {market.change24h}%
                 </td>
-                <td className="px-6 py-4 hidden md:table-cell text-muted-foreground">
+                <td className="px-6 py-4 hidden md:table-cell text-muted-foreground tabular-data">
                   {formatVolume(market.volume24h)}
                 </td>
-                 <td className="px-6 py-4 hidden md:table-cell text-muted-foreground">
+                <td className="px-6 py-1 hidden md:table-cell text-muted-foreground tabular-data">
                   {formatVolume(market.marketCap)}
                 </td>
                 <td className="px-6 py-2 hidden lg:table-cell">

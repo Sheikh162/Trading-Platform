@@ -98,7 +98,7 @@ services:
       #dockerfile: Dockerfile
     profiles: ["seed"]
     container_name: db-seed
-    command: npm run db:seed
+    command: pnpm run db:seed
     env_file:
       - ./db/.env
     environment:

@@ -4,7 +4,7 @@ import { ORDER_UPDATE, TRADE_ADDED } from "../types/index";
 import { CANCEL_ORDER, CREATE_ORDER, GET_BALANCE, GET_DEPTH, GET_OPEN_ORDERS, MessageFromApi, ON_RAMP, USER_CREATED } from "../types/fromApi";
 import { Fill, Order, Orderbook } from "./Orderbook";
 
-export const BASE_CURRENCY = "INR";
+export const BASE_CURRENCY = "USDT";
 
 interface UserBalance {
     [key: string]: {
@@ -14,7 +14,7 @@ interface UserBalance {
 }
 
 export class Engine {
-    private orderbooks: Orderbook[] = []; // TATA_INR, APPLE_INR etc orderbook is basically like broker, who manages the 2 parties i.e the buyer and seller.
+    private orderbooks: Orderbook[] = []; // BTC_USDT etc orderbook is basically like broker, who manages the 2 parties i.e the buyer and seller.
     private balances: Map<string, UserBalance> = new Map(); // userid is key, userbalance interface is the value
 
     constructor() {
@@ -38,7 +38,7 @@ export class Engine {
             console.log(this.orderbooks)
             console.log(this.balances)
         } else {
-            this.orderbooks = [new Orderbook(`TATA`, [], [], 0, 0)];
+            this.orderbooks = [new Orderbook(`BTC`, [], [], 0, 0)];
             this.setBaseBalances();
         }
         setInterval(() => {
@@ -457,7 +457,7 @@ export class Engine {
                 available: 10000000,
                 locked: 0
             },
-            "TATA": {
+            "BTC": {
                 available: 10000000,
                 locked: 0
             }
@@ -468,7 +468,7 @@ export class Engine {
                 available: 10000000,
                 locked: 0
             },
-            "TATA": {
+            "BTC": {
                 available: 10000000,
                 locked: 0
             }
@@ -479,7 +479,7 @@ export class Engine {
                 available: 10000000,
                 locked: 0
             },
-            "TATA": {
+            "BTC": {
                 available: 10000000,
                 locked: 0
             }
@@ -492,7 +492,7 @@ export class Engine {
                 available: 10000000,
                 locked: 0
             },
-            "TATA": {
+            "BTC": {
                 available: 10000000,
                 locked: 0
             }

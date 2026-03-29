@@ -2,15 +2,15 @@ import { Asset } from "./types";
 
 const MOCK_ASSETS: Asset[] = [
     {
-        symbol: "INR",
-        name: "Indian Rupee",
+        symbol: "USDT",
+        name: "Tether",
         balance: "12050.00",
         value: "12050.00",
         avgBuyPrice: "1.00",
-        unrealizedPnL: "0.00%",
+        unrealizedPnL: "0.00%", 
         unrealizedPnLValue: "0.00",
         allocation: 30,
-        icon: "/india-flag.png" 
+        icon: "/usdt.png" 
     },
     {
         symbol: "SOL",
@@ -24,15 +24,15 @@ const MOCK_ASSETS: Asset[] = [
         icon: "/solana-icon.png"
     },
     {
-        symbol: "TATA",
-        name: "Tata Motors",
+        symbol: "BTC",
+        name: "Bitcoin",
         balance: "250",
         value: "245000.00",
-        avgBuyPrice: "900.00",
+        avgBuyPrice: "64230.50",
         unrealizedPnL: "+8.9%",
         unrealizedPnLValue: "+20000.00",
         allocation: 25,
-        icon: "/tata-icon.png"
+        icon: "/btc.png"
     }
 ];
 

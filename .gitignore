@@ -1,30 +1,51 @@
-# Node modules
+# Node modules (covers root and all subdirectories)
 node_modules/
+.pnpm-debug.log*
 
 # Build output
 dist/
 build/
+.next/
+out/
 *.tsbuildinfo
 
-# Environment files
+# Environment files (CRITICAL: Never commit secrets)
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .env.*
 !.env.example
 
+# Engine Snapshots & Persistent Data
+snapshot.json
+engine/snapshot.json
+engine/src/snapshot.json
+
+# Agent & CLI Files
+.agents/
+skills-lock.json
+
 # Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# OS files
+# OS & Editor files
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
-
-# Editor files
+ehthumbs.db
+Desktop.ini
 .vscode/
 .idea/
-
-# Misc
 *.swp
 *.swo
 
-# Ignore snapshots and data
-snapshot.json 
+# Testing
+coverage/
+.vitest-result/

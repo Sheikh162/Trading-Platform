@@ -103,4 +103,4 @@ This project is fully containerized. Follow these steps to get all services up a
 ---
 ## 📂 Project Architecture
 
-![Architecture Diagram](architecture.jpg)
+![Architecture Diagram](frontend/public/architecture.jpg)

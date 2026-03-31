@@ -27,9 +27,9 @@ The market maker follows a simple but effective strategy:
 5. **Continuous Operation**: Repeats the process every second
 
 ### Configuration Parameters
-- **TOTAL_BIDS**: Target number of buy orders to maintain (default: 5)
-- **TOTAL_ASK**: Target number of sell orders to maintain (default: 5)
-- **MARKET**: Trading pair to provide liquidity for (default: "TATA_INR")
+- **TOTAL_BIDS**: Target number of buy orders to maintain (default: 30)
+- **TOTAL_ASK**: Target number of sell orders to maintain (default: 30)
+- **MARKET**: Trading pair to provide liquidity for (default: "BTC_USDT")
 - **BUY_USER_ID**: User ID for buy orders (default: "2")
 - **SELL_USER_ID**: User ID for sell orders (default: "5")
 
@@ -74,27 +74,18 @@ The service interacts with the API service for:
 
 #### Get Open Orders
 ```bash
-GET /api/v1/order/open?userId=2&market=TATA_INR
+GET /api/v1/order/open?userId=2&market=BTC_USDT
 ```
 
 #### Place Buy Order
 ```bash
 POST /api/v1/order
 {
-  "market": "TATA_INR",
-  "price": "999.5",
+  "market": "BTC_USDT",
+  "price": "49999.5",
   "quantity": "1",
   "side": "buy",
   "userId": "2"
-}
-```
-
-#### Cancel Order
-```bash
-DELETE /api/v1/order
-{
-  "orderId": "order_123",
-  "market": "TATA_INR"
 }
 ```
 
@@ -107,16 +98,17 @@ DELETE /api/v1/order
 ## Environment Variables
 
 - `API_BASE_URL`: Base URL for the API service
-- `TOTAL_BIDS`: Number of buy orders to maintain (default: 5)
-- `TOTAL_ASK`: Number of sell orders to maintain (default: 5)
-- `MARKET`: Trading pair symbol (default: "TATA_INR")
+- `TOTAL_BIDS`: Number of buy orders to maintain (default: 30)
+- `TOTAL_ASK`: Number of sell orders to maintain (default: 30)
+- `MARKET`: Trading pair symbol (default: "BTC_USDT")
 - `BUY_USER_ID`: User ID for buy orders (default: "2")
 - `SELL_USER_ID`: User ID for sell orders (default: "5")
 
 ## Development
 
 ### Prerequisites
-- Node.js
+- Node.js 20+
+- pnpm 10.32.1 (Enable with `corepack enable`)
 - API service running and accessible
 - Trading engine service operational
 - User accounts with sufficient balances
@@ -125,16 +117,16 @@ DELETE /api/v1/order
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Build TypeScript
-npm run build
+pnpm run build
 
 # Start the market maker
-npm start
+pnpm start
 
 # Development mode (build + start)
-npm run dev
+pnpm run dev
 ```
 
 ### Project Structure
@@ -143,102 +135,3 @@ npm run dev
 src/
 └── index.ts              # Main market maker logic
 ```
-
-## Operation Flow
-
-### Main Loop
-The service operates in a continuous loop:
-
-1. **Generate Base Price**: Creates a reference price with small variations
-2. **Fetch Open Orders**: Retrieves current orders for both users
-3. **Count Existing Orders**: Calculates current bid/ask counts
-4. **Cancel Outdated Orders**: Removes orders that don't meet criteria
-5. **Calculate New Orders**: Determines how many orders to place
-6. **Place New Orders**: Creates orders to reach target counts
-7. **Wait and Repeat**: Pauses for 1 second before next iteration
-
-### Error Handling
-- **API Failures**: Continues operation on individual API call failures
-- **Network Issues**: Implements retry logic for network problems
-- **Order Validation**: Handles invalid order responses gracefully
-
-## Performance Characteristics
-
-### Execution Speed
-- **1-Second Cycle**: Completes full cycle every second
-- **Parallel Operations**: Uses Promise.all for concurrent order operations
-- **Efficient Cancellation**: Batches order cancellations for performance
-
-### Resource Usage
-- **Low CPU**: Simple algorithm with minimal computational overhead
-- **Minimal Memory**: Lightweight with no persistent state
-- **Network Efficient**: Optimized API calls with minimal overhead
-
-## Risk Management
-
-### Order Limits
-- **Fixed Quantities**: Uses consistent order sizes (1 unit)
-- **Price Bounds**: Orders stay within reasonable price ranges
-- **User Separation**: Uses different users for buy/sell orders
-
-### Market Impact
-- **Small Orders**: Minimal market impact with small order sizes
-- **Continuous Adjustment**: Adapts to market conditions quickly
-- **Liquidity Provision**: Improves market liquidity without manipulation
-
-## Monitoring and Logging
-
-The service provides logging for:
-- Order placement and cancellation
-- API response status
-- Error conditions
-- Market making statistics
-
-## Integration with Trading Platform
-
-### Dependencies
-- **API Service**: For order management operations
-- **Trading Engine**: For order processing and matching
-- **User Accounts**: Requires configured user accounts with balances
-
-### Data Flow
-1. Market maker generates orders
-2. Orders sent to API service
-3. API service forwards to trading engine
-4. Trading engine processes and matches orders
-5. Market maker receives execution updates
-6. Process repeats with updated market conditions
-
-## Configuration and Customization
-
-### Strategy Parameters
-The market making strategy can be customized by modifying:
-- Order quantities and frequencies
-- Price spread parameters
-- Cancellation logic
-- Market selection
-
-### User Management
-- Configure different user IDs for buy/sell operations
-- Ensure users have sufficient balances
-- Monitor user account status
-
-## Best Practices
-
-### Deployment
-- Run as a background service
-- Monitor for continuous operation
-- Implement health checks
-- Use process managers for reliability
-
-### Monitoring
-- Track order placement success rates
-- Monitor API response times
-- Watch for error patterns
-- Analyze market impact
-
-### Maintenance
-- Regular balance checks for user accounts
-- Monitor market making effectiveness
-- Adjust parameters based on market conditions
-- Update strategy as needed

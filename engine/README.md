@@ -90,14 +90,14 @@ The engine publishes real-time data via Redis channels:
 ### Trade Updates (`trade@{market}`)
 ```json
 {
-  "stream": "trade@TATA_INR",
+  "stream": "trade@BTC_USDT",
   "data": {
     "e": "trade",
     "t": 12345,
     "m": false,
-    "p": "1000.50",
-    "q": "10",
-    "s": "TATA_INR"
+    "p": "50000.50",
+    "q": "0.1",
+    "s": "BTC_USDT"
   }
 }
 ```
@@ -105,23 +105,11 @@ The engine publishes real-time data via Redis channels:
 ### Depth Updates (`depth@{market}`)
 ```json
 {
-  "stream": "depth@TATA_INR",
+  "stream": "depth@BTC_USDT",
   "data": {
-    "a": [["1001.00", "50"]],  // Asks
-    "b": [["1000.00", "30"]],  // Bids
+    "a": [["50001.00", "0.5"]],  // Asks
+    "b": [["50000.00", "0.3"]],  // Bids
     "e": "depth"
-  }
-}
-```
-
-### Ticker Updates (`ticker@{market}`)
-```json
-{
-  "stream": "ticker@TATA_INR",
-  "data": {
-    "c": "1000.50",
-    "s": "TATA_INR",
-    "e": "ticker"
   }
 }
 ```
@@ -134,24 +122,6 @@ The engine publishes real-time data via Redis channels:
 - **Order Book State**: Preserves all open orders
 - **Balance State**: Maintains user balances
 - **Trade History**: Tracks executed trades
-
-### Snapshot Structure
-```json
-{
-  "orderbooks": [
-    {
-      "baseAsset": "TATA",
-      "bids": [...],
-      "asks": [...],
-      "lastTradeId": 12345,
-      "currentPrice": 1000.50
-    }
-  ],
-  "balances": [
-    ["user1", {"INR": {"available": 10000, "locked": 500}}]
-  ]
-}
-```
 
 ## Dependencies
 
@@ -171,7 +141,8 @@ The engine publishes real-time data via Redis channels:
 ## Development
 
 ### Prerequisites
-- Node.js
+- Node.js 20+
+- pnpm 10.32.1 (Enable with `corepack enable`)
 - Redis server
 - API service for order input
 
@@ -179,19 +150,19 @@ The engine publishes real-time data via Redis channels:
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Build TypeScript
-npm run build
+pnpm run build
 
 # Start the engine
-npm start
+pnpm start
 
 # Development mode (build + start)
-npm run dev
+pnpm run dev
 
 # Run tests
-npm test
+pnpm test
 ```
 
 ### Project Structure
@@ -205,59 +176,5 @@ src/
 │   ├── Orderbook.ts     # Order book management
 │   └── events.ts        # Event definitions
 ├── types/                # TypeScript definitions
-│   ├── index.ts         # Core types
-│   ├── fromApi.ts       # API message types
-│   ├── toApi.ts         # Response types
-│   └── toWs.ts          # WebSocket message types
 └── tests/                # Test files
-    ├── engine.test.ts   # Engine tests
-    └── orderbook.test.ts # Orderbook tests
 ```
-
-## Testing
-
-The engine includes comprehensive tests for:
-- Order matching logic
-- Balance management
-- Order book operations
-- Trade execution
-- Error handling
-
-Run tests with:
-```bash
-npm test
-```
-
-## Performance Characteristics
-
-- **Low Latency**: Optimized for high-frequency trading
-- **High Throughput**: Processes thousands of orders per second
-- **Memory Efficient**: Efficient data structures for order books
-- **Scalable**: Can handle multiple markets simultaneously
-
-## Error Handling
-
-- **Order Validation**: Validates orders before processing
-- **Balance Checks**: Ensures sufficient funds before order placement
-- **Market Validation**: Verifies market existence
-- **Graceful Degradation**: Continues operation on non-critical errors
-
-## Integration Points
-
-### Input Sources
-- **API Service**: Receives orders via Redis queue
-- **Market Maker**: Processes automated trading orders
-
-### Output Destinations
-- **Database Service**: Publishes trade data for persistence
-- **WebSocket Service**: Publishes real-time market data
-- **API Service**: Sends order execution confirmations
-
-## Monitoring and Logging
-
-The engine provides detailed logging for:
-- Order processing
-- Trade execution
-- Balance updates
-- Error conditions
-- Performance metrics

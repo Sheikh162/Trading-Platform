@@ -1,37 +1,30 @@
-# ---- Build stage ----
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# 1. Install pnpm
-RUN npm install -g pnpm
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
-# 2. Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY db/package.json ./db/package.json
 
-# 3. Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --filter db... --frozen-lockfile
 
-# Copy source and build
-COPY tsconfig.json ./
-COPY src ./src
-RUN pnpm run build
+COPY db/tsconfig.json ./db/tsconfig.json
+COPY db/src ./db/src
 
-# ---- Run stage ----
+RUN pnpm --filter db run build
+
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# 1. Install pnpm
-RUN npm install -g pnpm
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
-# 2. Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY db/package.json ./db/package.json
 
-# 3. Install only prod dependencies
-RUN pnpm install --prod
+RUN pnpm install --filter db --prod --frozen-lockfile
 
-# Copy built files
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/db/dist ./db/dist
 
-# Default command (will be overridden by docker-compose)
+WORKDIR /app/db
 CMD ["node", "dist/index.js"]

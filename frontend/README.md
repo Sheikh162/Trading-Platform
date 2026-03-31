@@ -4,7 +4,7 @@ The Frontend service is a modern Next.js-based web application that provides the
 
 ## Overview
 
-This service delivers a responsive, real-time trading interface built with Next.js 15, React 19, and modern web technologies. It provides users with comprehensive trading tools, market visualization, and real-time data updates.
+This service delivers a responsive, real-time trading interface built with Next.js 16, React 19, and modern web technologies. It provides users with comprehensive trading tools, market visualization, and real-time data updates.
 
 ## Features
 
@@ -19,7 +19,7 @@ This service delivers a responsive, real-time trading interface built with Next.
 ## Technology Stack
 
 ### Core Framework
-- **Next.js 15**: React framework with App Router
+- **Next.js 16**: React framework with App Router
 - **React 19**: Latest React with concurrent features
 - **TypeScript**: Type-safe development
 - **Tailwind CSS**: Utility-first CSS framework
@@ -84,7 +84,7 @@ The frontend connects to the WebSocket service for real-time updates:
 ```typescript
 // Example WebSocket subscription
 const wsClient = new WebSocketClient();
-wsClient.subscribe('trade@TATA_INR', (data) => {
+wsClient.subscribe('trade@BTC_USDT', (data) => {
   // Handle trade updates
 });
 ```
@@ -120,34 +120,34 @@ The frontend communicates with the API service for:
 ## Development
 
 ### Prerequisites
-- Node.js 18+
-- npm or yarn
+- Node.js 20+
+- pnpm 10.32.1 (Enable with `corepack enable`)
 - Backend services running
 
 ### Getting Started
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Start development server
-npm run dev
+pnpm run dev # Running on http://localhost:3002
 
 # Build for production
-npm run build
+pnpm run build
 
 # Start production server
-npm start
+pnpm start
 
 # Run linting
-npm run lint
+pnpm run lint
 ```
 
 ### Development Scripts
-- `npm run dev`: Start development server with Turbopack
-- `npm run build`: Build optimized production bundle
-- `npm run start`: Start production server
-- `npm run lint`: Run ESLint for code quality
+- `pnpm run dev`: Start development server with Turbopack on port 3002
+- `pnpm run build`: Build optimized production bundle
+- `pnpm run start`: Start production server on port 3002
+- `pnpm run lint`: Run ESLint for code quality
 
 ### Project Structure
 
@@ -206,8 +206,8 @@ src/
 
 ### Production Build
 ```bash
-npm run build
-npm start
+pnpm run build
+pnpm start
 ```
 
 ### Docker Support

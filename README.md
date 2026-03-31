@@ -9,7 +9,7 @@ A full-stack, microservices-based trading platform featuring real-time order mat
 | Category       | Technology / Feature                                                       |
 | -------------- | -------------------------------------------------------------------------- |
 | **Architecture** | Microservices (API, Engine, WebSocket, DB Worker, Frontend, Market Maker) |
-| **Frontend**     | Next.js 14, React 19, TypeScript, Tailwind CSS, Lightweight Charts       |
+| **Frontend**     | Next.js 16, React 19, TypeScript, Tailwind CSS, Lightweight Charts       |
 | **Backend**      | Node.js, Express.js, TypeScript                                           |
 | **Database**     | TimescaleDB (for time-series trade data)                                 |
 | **Real-time**    | WebSocket, Redis Pub/Sub for live order book and trade notifications     |
@@ -26,6 +26,8 @@ This project is fully containerized. Follow these steps to get all services up a
 ### Prerequisites
 - Docker
 - Docker Compose
+- Node.js 20+
+- pnpm 10.32.1 (use `corepack enable` to manage version)
 
 ### Steps
 

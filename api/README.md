@@ -35,9 +35,9 @@ POST /api/v1/order
 Content-Type: application/json
 
 {
-  "market": "TATA_INR",
-  "price": "1000.5",
-  "quantity": "10",
+  "market": "BTC_USDT",
+  "price": "50000.5",
+  "quantity": "0.1",
   "side": "buy",
   "userId": "user123"
 }
@@ -45,7 +45,7 @@ Content-Type: application/json
 
 ### Get Open Orders
 ```bash
-GET /api/v1/order/open?userId=user123&market=TATA_INR
+GET /api/v1/order/open?userId=user123&market=BTC_USDT
 ```
 
 ## Architecture
@@ -74,7 +74,8 @@ The API service uses a request-response pattern with Redis:
 ## Development
 
 ### Prerequisites
-- Node.js
+- Node.js 20+
+- pnpm 10.32.1 (Enable with `corepack enable`)
 - Redis server
 - Trading engine service
 
@@ -82,16 +83,16 @@ The API service uses a request-response pattern with Redis:
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Build TypeScript
-npm run build
+pnpm run build
 
 # Start the service
-npm start
+pnpm start
 
 # Development mode (build + start)
-npm run dev
+pnpm run dev
 ```
 
 ### Project Structure
@@ -110,27 +111,3 @@ src/
     ├── index.ts         # Main type definitions
     └── to.ts            # Message types for engine communication
 ```
-
-## Communication Flow
-
-1. Client sends HTTP request to API
-2. API validates request and creates message
-3. Message sent to Redis queue for engine processing
-4. API subscribes to response channel
-5. Engine processes message and publishes response
-6. API receives response and sends HTTP reply to client
-
-## Error Handling
-
-The service includes comprehensive error handling for:
-- Invalid request parameters
-- Redis connection issues
-- Engine communication timeouts
-- Order validation failures
-
-## Performance Considerations
-
-- Uses Redis pub/sub for real-time communication
-- Implements connection pooling for Redis
-- Supports concurrent request handling
-- Optimized for low-latency trading operations

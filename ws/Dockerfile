@@ -1,37 +1,31 @@
-# ---- Build stage ----
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# 1. Install pnpm
-RUN npm install -g pnpm
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
-# 2. Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY ws/package.json ./ws/package.json
 
-# 3. Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --filter ws... --frozen-lockfile
 
-# Copy source and build
-COPY tsconfig.json ./
-COPY src ./src
-RUN pnpm run build
+COPY ws/tsconfig.json ./ws/tsconfig.json
+COPY ws/src ./ws/src
 
-# ---- Run stage ----
+RUN pnpm --filter ws run build
+
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# 1. Install pnpm
-RUN npm install -g pnpm
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
-# 2. Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY ws/package.json ./ws/package.json
 
-# 3. Install only prod dependencies
-RUN pnpm install --prod
+RUN pnpm install --filter ws --prod --frozen-lockfile
 
-# Copy built files
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/ws/dist ./ws/dist
 
+WORKDIR /app/ws
 EXPOSE 3001
 CMD ["node", "dist/index.js"]

@@ -1,16 +1,18 @@
 {
   "name": "trading-platform-root",
   "version": "1.0.0",
+  "private": true,
   "description": "Root management for the Trading Platform microservices",
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
     "infra": "docker compose up redis timescaledb -d",
     "dev": "pnpm run infra && concurrently --kill-others --handle-input \"pnpm run dev:engine\" \"pnpm run dev:db\" \"pnpm run dev:api\" \"pnpm run dev:ws\" \"pnpm run dev:mm\" \"pnpm run dev:frontend\"",
-    "dev:engine": "cd engine && pnpm run dev",
-    "dev:db": "cd db && pnpm run dev",
-    "dev:api": "cd api && pnpm run dev",
-    "dev:ws": "cd ws && pnpm run dev",
-    "dev:mm": "cd mm && pnpm run dev",
-    "dev:frontend": "cd frontend && pnpm run dev"
+    "dev:engine": "pnpm --filter engine run dev",
+    "dev:db": "pnpm --filter db run dev",
+    "dev:api": "pnpm --filter api run dev",
+    "dev:ws": "pnpm --filter ws run dev",
+    "dev:mm": "pnpm --filter mm run dev",
+    "dev:frontend": "pnpm --filter frontend run dev"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"

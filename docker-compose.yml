@@ -28,11 +28,11 @@ services:
 
   api:
     build:
-      context: ./api
-      #dockerfile: Dockerfile
+      context: .
+      dockerfile: api/Dockerfile
     restart: unless-stopped
     container_name: api
-    command: npm run start
+    command: pnpm run start
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -51,11 +51,10 @@ services:
 
   ws:
     build:
-      context: ./ws
-      #dockerfile: Dockerfile
+      context: .
+      dockerfile: ws/Dockerfile
     restart: unless-stopped
     container_name: ws
-    command: npm run start
     depends_on:
       redis:
         condition: service_started
@@ -71,11 +70,10 @@ services:
 
   engine:
     build:
-      context: ./engine
-      #dockerfile: Dockerfile
+      context: .
+      dockerfile: engine/Dockerfile
     restart: unless-stopped
     container_name: engine
-    command: npm run start
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -94,8 +92,8 @@ services:
 
   db-seed:
     build:
-      context: ./db
-      #dockerfile: Dockerfile
+      context: .
+      dockerfile: db/Dockerfile
     profiles: ["seed"]
     container_name: db-seed
     command: pnpm run db:seed
@@ -114,11 +112,11 @@ services:
 
   db-worker:
     build:
-      context: ./db
-      #dockerfile: Dockerfile
+      context: .
+      dockerfile: db/Dockerfile
     restart: unless-stopped
     container_name: db-worker
-    command: npm run start
+    command: pnpm run start
     env_file:
       - ./db/.env
     environment:
@@ -134,11 +132,11 @@ services:
 
   db-cron:
     build:
-      context: ./db
-      #dockerfile: Dockerfile
+      context: .
+      dockerfile: db/Dockerfile
     restart: unless-stopped
     container_name: db-cron
-    command: npm run refresh:views
+    command: pnpm run refresh:views
     env_file:
       - ./db/.env
     environment:
@@ -154,8 +152,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      #dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: http://localhost:3000/api/v1
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
@@ -175,11 +173,11 @@ services:
 
   mm:
     build:
-      context: ./mm
-      #dockerfile: Dockerfile
+      context: .
+      dockerfile: mm/Dockerfile
     restart: unless-stopped
     container_name: mm
-    command: npm run start
+    command: pnpm run start
     depends_on:
       api:
         condition: service_started

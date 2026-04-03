@@ -49,6 +49,15 @@ export class Orderbook {
         }
     }
 
+    restoreOrder(order: Order) {
+        if (order.side === "buy") {
+            this.insertBid(order);
+            return;
+        }
+
+        this.insertAsk(order);
+    }
+
     addOrder(order: Order): {executedQty: number,fills: Fill[]} {
         if (order.side === "buy") {
             const {executedQty, fills} = this.matchBid(order); 
@@ -59,17 +68,8 @@ export class Orderbook {
                     fills
                 }
             }
-    
-            if (this.bids.length==0 || order.price<=this.bids[this.bids.length-1].price) this.bids.push(order);
-            else{
-                for(let i=0;i<this.bids.length;i++){
-                    if(order.price>this.bids[i].price){
-                        this.bids.splice(i,0,order)
-                        //console.log(this.bids)
-                        break
-                    }
-                }
-            }
+
+            this.insertBid(order);
             return {
                 executedQty,
                 fills
@@ -83,15 +83,7 @@ export class Orderbook {
                     fills
                 }
             }
-            if (this.asks.length==0 || order.price>=this.asks[this.asks.length-1].price) this.asks.push(order);
-            else{
-                for(let i=0;i<this.asks.length;i++){ 
-                    if(order.price<this.asks[i].price){
-                        this.asks.splice(i,0,order)
-                        break
-                    }
-                }
-            }
+            this.insertAsk(order);
             return {
                 executedQty,
                 fills
@@ -292,6 +284,34 @@ export class Orderbook {
             const price = this.asks[index].price;
             this.asks.splice(index, 1);
             return price
+        }
+    }
+
+    private insertBid(order: Order) {
+        if (this.bids.length === 0 || order.price <= this.bids[this.bids.length - 1].price) {
+            this.bids.push(order);
+            return;
+        }
+
+        for (let i = 0; i < this.bids.length; i++) {
+            if (order.price > this.bids[i].price) {
+                this.bids.splice(i, 0, order);
+                return;
+            }
+        }
+    }
+
+    private insertAsk(order: Order) {
+        if (this.asks.length === 0 || order.price >= this.asks[this.asks.length - 1].price) {
+            this.asks.push(order);
+            return;
+        }
+
+        for (let i = 0; i < this.asks.length; i++) {
+            if (order.price < this.asks[i].price) {
+                this.asks.splice(i, 0, order);
+                return;
+            }
         }
     }
 

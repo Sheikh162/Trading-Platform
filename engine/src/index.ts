@@ -4,6 +4,7 @@ import { Engine } from "./trade/Engine";
 
 async function main() {
     const engine = new Engine(); 
+    await engine.hydrateFromDb();
     const redisUrl = process.env.REDIS_URL 
     || `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`;
 

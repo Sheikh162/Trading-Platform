@@ -12,17 +12,25 @@ type DbMessage = {
         quantity: string,
         quoteQuantity: string,
         timestamp: number,
-        market: string
+        market: string,
+        makerOrderId: string,
+        takerOrderId: string,
+        makerUserId: string,
+        takerUserId: string,
+        buyerUserId: string,
+        sellerUserId: string
     }
 } | {
     type: typeof ORDER_UPDATE,
     data: {
         orderId: string,
-        executedQty: number,
+        executedQty?: number,
         market?: string,
         price?: string,
         quantity?: string,
         side?: "buy" | "sell",
+        userId?: string,
+        status?: "open" | "partially_filled" | "filled" | "cancelled" | "rejected",
     }
 }
 
@@ -35,7 +43,9 @@ export class RedisManager {
         || `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`;
 
         this.client = createClient({ url: redisUrl });
-        this.client.connect();
+        this.client.connect().catch((error) => {
+            console.error("Failed to connect to Redis:", error);
+        });
     }
 
     public static getInstance() {

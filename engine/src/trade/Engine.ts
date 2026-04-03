@@ -1,7 +1,8 @@
 import fs from "fs";
+import { Client } from "pg";
 import { RedisManager } from "../RedisManager";
 import { ORDER_UPDATE, TRADE_ADDED } from "../types/index";
-import { CANCEL_ORDER, CREATE_ORDER, GET_BALANCE, GET_DEPTH, GET_OPEN_ORDERS, MessageFromApi, ON_RAMP, USER_CREATED } from "../types/fromApi";
+import { CANCEL_ORDER, CREATE_ORDER, GET_BALANCE, GET_DEPTH, GET_OPEN_ORDERS, MessageFromApi, ON_RAMP, USER_CREATED, WITHDRAW } from "../types/fromApi";
 import { Fill, Order, Orderbook } from "./Orderbook";
 
 export const BASE_CURRENCY = "USDT";
@@ -11,6 +12,16 @@ interface UserBalance {
         available: number;
         locked: number;
     }
+}
+
+interface PersistedOpenOrderRow {
+    id: string;
+    user_id: string;
+    market_symbol: string;
+    side: "buy" | "sell";
+    price: string;
+    quantity: string;
+    filled_quantity: string;
 }
 
 export class Engine {
@@ -39,11 +50,81 @@ export class Engine {
             console.log(this.balances)
         } else {
             this.orderbooks = [new Orderbook(`BTC`, [], [], 0, 0)];
-            this.setBaseBalances();
         }
         setInterval(() => {
             this.saveSnapshot();
         }, 1000 * 5);
+    }
+
+    async hydrateFromDb() {
+        const client = new Client({
+            user: process.env.POSTGRES_USER,
+            host: process.env.POSTGRES_HOST,
+            database: process.env.POSTGRES_DB,
+            password: process.env.POSTGRES_PASSWORD,
+            port: Number(process.env.POSTGRES_PORT),
+        });
+
+        await client.connect();
+        try {
+            const [marketsResult, balancesResult, openOrdersResult] = await Promise.all([
+                client.query(`
+                    SELECT symbol
+                    FROM markets
+                    WHERE status = 'active'
+                    ORDER BY symbol
+                `),
+                client.query(`
+                    SELECT user_id, asset, available::text AS available, locked::text AS locked
+                    FROM balances
+                    ORDER BY user_id, asset
+                `),
+                client.query(`
+                    SELECT id, user_id, market_symbol, side, price::text AS price, quantity::text AS quantity, filled_quantity::text AS filled_quantity
+                    FROM orders
+                    WHERE status IN ('open', 'partially_filled')
+                    ORDER BY created_at ASC
+                `),
+            ]);
+
+            const marketSymbols = marketsResult.rows.map((row: { symbol: string }) => row.symbol);
+            const existing = new Set(this.orderbooks.map((orderbook) => orderbook.ticker()));
+
+            if (this.orderbooks.length === 1 && this.orderbooks[0]?.ticker() === "BTC_USDT" && marketSymbols.includes("BTC_USDT")) {
+                existing.add("BTC_USDT");
+            }
+
+            for (const symbol of marketSymbols) {
+                if (!existing.has(symbol)) {
+                    const [baseAsset] = symbol.split("_");
+                    this.orderbooks.push(new Orderbook(baseAsset, [], [], 0, 0));
+                }
+            }
+
+            const hydratedBalances = new Map<string, UserBalance>();
+            for (const row of balancesResult.rows) {
+                const userId = row.user_id as string;
+                const asset = row.asset as string;
+                const userBalance = hydratedBalances.get(userId) ?? {};
+                userBalance[asset] = {
+                    available: Number(row.available),
+                    locked: Number(row.locked),
+                };
+                hydratedBalances.set(userId, userBalance);
+            }
+
+            this.balances = hydratedBalances;
+            this.restoreOpenOrders(openOrdersResult.rows as PersistedOpenOrderRow[]);
+            console.log(`Hydrated ${this.balances.size} users from PostgreSQL`);
+            console.log(`Hydrated ${marketSymbols.length} markets from PostgreSQL`);
+            if (openOrdersResult.rows.length > 0) {
+                console.log(`[engine] Restored ${openOrdersResult.rows.length} open orders from PostgreSQL into the in-memory orderbook`);
+            } else {
+                console.log("[engine] No open orders found in PostgreSQL at startup");
+            }
+        } finally {
+            await client.end();
+        }
     }
 
     saveSnapshot() {
@@ -95,6 +176,9 @@ export class Engine {
                     //finding order from asks, bids from the orderbook
                     const order = cancelOrderbook.asks.find(o => o.orderId === orderId) || cancelOrderbook.bids.find(o => o.orderId === orderId);
                     if (!order) {
+                        console.log(`[engine] cancel miss orderId=${orderId} market=${cancelMarket} inMemoryBids=${cancelOrderbook.bids.length} inMemoryAsks=${cancelOrderbook.asks.length}`);
+                        console.log("[engine] top in-memory bid ids:", cancelOrderbook.bids.slice(0, 5).map(o => o.orderId));
+                        console.log("[engine] top in-memory ask ids:", cancelOrderbook.asks.slice(0, 5).map(o => o.orderId));
                         console.log("No order found");
                         throw new Error("No order found");
                     }
@@ -130,7 +214,13 @@ export class Engine {
                             remainingQty: 0
                         }
                     });
-
+                    RedisManager.getInstance().pushMessage({
+                        type: ORDER_UPDATE,
+                        data: {
+                            orderId,
+                            status: "cancelled",
+                        }
+                    });
                 } catch (e) {
                     console.log("Error hwile cancelling order",);
                     console.log(e);
@@ -156,6 +246,9 @@ export class Engine {
                 const userId = message.data.userId;
                 const amount = Number(message.data.amount);
                 this.onRamp(userId, amount);
+                break;
+            case WITHDRAW:
+                this.withdraw(message.data.userId, Number(message.data.amount));
                 break;
             case GET_DEPTH:
                 try {
@@ -206,7 +299,27 @@ export class Engine {
         this.orderbooks.push(orderbook);
     }
 
+    restoreOpenOrders(openOrders: PersistedOpenOrderRow[]) {
+        for (const persistedOrder of openOrders) {
+            const orderbook = this.orderbooks.find((o) => o.ticker() === persistedOrder.market_symbol);
+            if (!orderbook) {
+                console.log(`[engine] skipping restore for orderId=${persistedOrder.id} missing market=${persistedOrder.market_symbol}`);
+                continue;
+            }
+
+            orderbook.restoreOrder({
+                orderId: persistedOrder.id,
+                userId: persistedOrder.user_id,
+                side: persistedOrder.side,
+                price: Number(persistedOrder.price),
+                quantity: Number(persistedOrder.quantity),
+                filled: Number(persistedOrder.filled_quantity),
+            });
+        }
+    }
+
     createOrder({ market, price, quantity, side, userId }: Extract<MessageFromApi, { type: typeof CREATE_ORDER }>["data"]) {
+        console.log(`[engine] createOrder request user=${userId} market=${market} side=${side} price=${price} quantity=${quantity}`);
         const orderbook = this.orderbooks.find(o => o.ticker() === market)
         const baseAsset = market.split("_")[0];
         const quoteAsset = market.split("_")[1];
@@ -228,8 +341,9 @@ export class Engine {
 
         const { fills, executedQty } = orderbook.addOrder(order);
         this.updateBalance(userId, baseAsset, quoteAsset, side, fills, executedQty);
-        this.createDbTrades(fills, market, userId);
+        // Persist the taker order before trade fills so FK-constrained trade_fills inserts succeed.
         this.updateDbOrders(order, executedQty, fills, market);
+        this.createDbTrades(fills, market, userId, side, order.orderId);
         //this.publishWsDepthUpdates(fills, price, side, market);  implement later
 
         if (fills.length > 0) {
@@ -240,10 +354,11 @@ export class Engine {
         }
 
         this.publishWsTrades(fills, userId, market);
+        console.log(`[engine] createOrder success orderId=${order.orderId} executedQty=${executedQty} fills=${fills.length}`);
         return { executedQty, fills, orderId: order.orderId };
     }
 
-    createDbTrades(fills: Fill[], market: string, userId: string) {
+    createDbTrades(fills: Fill[], market: string, userId: string, side: "buy" | "sell", orderId: string) {
         fills.forEach(fill => {
             RedisManager.getInstance().pushMessage({
                 type: TRADE_ADDED,
@@ -254,7 +369,13 @@ export class Engine {
                     price: fill.price,
                     quantity: fill.qty.toString(),// this pushes volume also
                     quoteQuantity: (fill.qty * Number(fill.price)).toString(),
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    makerOrderId: fill.markerOrderId,
+                    takerOrderId: orderId,
+                    makerUserId: fill.otherUserId,
+                    takerUserId: userId,
+                    buyerUserId: side === "buy" ? userId : fill.otherUserId,
+                    sellerUserId: side === "sell" ? userId : fill.otherUserId
                 }
             });
         });
@@ -270,6 +391,12 @@ export class Engine {
                 price: order.price.toString(),
                 quantity: order.quantity.toString(),
                 side: order.side,
+                userId: order.userId,
+                status: executedQty === 0
+                    ? "open"
+                    : executedQty >= order.quantity
+                        ? "filled"
+                        : "partially_filled",
             }
         });
 
@@ -444,59 +571,53 @@ export class Engine {
                 [BASE_CURRENCY]: {
                     available: amount,
                     locked: 0
-                }
+                },
+                "BTC": {
+                    available: 0,
+                    locked: 0
+                },
+                "SOL": {
+                    available: 0,
+                    locked: 0
+                },
             });
         } else {
+            if (!userBalance[BASE_CURRENCY]) {
+                userBalance[BASE_CURRENCY] = {
+                    available: 0,
+                    locked: 0
+                };
+            }
             userBalance[BASE_CURRENCY].available += amount;
         }
     }
 
-    setBaseBalances() {
-        this.balances.set("1", {
-            [BASE_CURRENCY]: {
-                available: 10000000,
-                locked: 0
-            },
-            "BTC": {
-                available: 10000000,
-                locked: 0
-            }
-        });
+    withdraw(userId: string, amount: number) {
+        const userBalance = this.balances.get(userId);
+        if (!userBalance || userBalance[BASE_CURRENCY].available < amount) {
+            throw new Error("Insufficient funds");
+        }
 
-        this.balances.set("2", {
-            [BASE_CURRENCY]: {
-                available: 10000000,
-                locked: 0
-            },
-            "BTC": {
-                available: 10000000,
-                locked: 0
-            }
-        });
-
-        this.balances.set("5", {
-            [BASE_CURRENCY]: {
-                available: 10000000,
-                locked: 0
-            },
-            "BTC": {
-                available: 10000000,
-                locked: 0
-            }
-        });
+        userBalance[BASE_CURRENCY].available -= amount;
     }
 
     createUser(userId: string) {
-        this.balances.set(userId, {
-            [BASE_CURRENCY]: {
-                available: 10000000,
-                locked: 0
-            },
-            "BTC": {
-                available: 10000000,
-                locked: 0
-            }
-        });
+        if (!this.balances.has(userId)) {
+            this.balances.set(userId, {
+                [BASE_CURRENCY]: {
+                    available: 0,
+                    locked: 0
+                },
+                "BTC": {
+                    available: 0,
+                    locked: 0
+                },
+                "SOL": {
+                    available: 0,
+                    locked: 0
+                }
+            });
+        }
     }
 
 }

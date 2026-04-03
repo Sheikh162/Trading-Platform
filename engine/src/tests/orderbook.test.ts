@@ -1,5 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Orderbook } from "../trade/Orderbook";
+
+vi.mock("../RedisManager", () => ({
+    RedisManager: {
+        getInstance: () => ({
+            publishMessage: vi.fn(),
+            sendToApi: vi.fn(),
+            pushMessage: vi.fn(),
+        }),
+    },
+}));
 
 describe("Simple orders", () => {
     it("Empty orderbook should not be filled", () => {
@@ -109,6 +119,48 @@ describe("Self trade prevention", () => {
         expect(executedQty).toBe(0);
     });
 
+});
+
+describe("Restored resting orders", () => {
+    it("restores bids and asks with book ordering preserved", () => {
+        const orderbook = new Orderbook("BTC", [], [], 0, 0);
+
+        orderbook.restoreOrder({
+            price: 1001,
+            quantity: 1,
+            orderId: "bid-1",
+            filled: 0,
+            side: "buy",
+            userId: "1"
+        });
+        orderbook.restoreOrder({
+            price: 1005,
+            quantity: 1,
+            orderId: "bid-2",
+            filled: 0,
+            side: "buy",
+            userId: "2"
+        });
+        orderbook.restoreOrder({
+            price: 1007,
+            quantity: 1,
+            orderId: "ask-1",
+            filled: 0,
+            side: "sell",
+            userId: "3"
+        });
+        orderbook.restoreOrder({
+            price: 1003,
+            quantity: 1,
+            orderId: "ask-2",
+            filled: 0,
+            side: "sell",
+            userId: "4"
+        });
+
+        expect(orderbook.bids.map((order) => order.orderId)).toEqual(["bid-2", "bid-1"]);
+        expect(orderbook.asks.map((order) => order.orderId)).toEqual(["ask-2", "ask-1"]);
+    });
 });
 
 describe("Precission errors are taken care of", () => {

@@ -1,9 +1,12 @@
 import { TransactionTable } from "@/src/components/wallet/TransactionTable";
 import { getTransactions } from "@/src/lib/wallet";
 import { WalletActions } from "@/src/components/wallet/WalletActions";
+import { auth } from "@clerk/nextjs/server";
 
 export default async function WalletPage() {
-    const transactions = await getTransactions();
+    const authData = await auth();
+    const token = authData.userId ? await authData.getToken() : null;
+    const transactions = await getTransactions(token);
 
     return (
         <div className="mx-auto max-w-7xl px-4 md:px-8 py-12 space-y-8">

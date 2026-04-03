@@ -1,22 +1,35 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 
 import { toast } from "sonner"; // Assuming you installed sonner as recommended
-import { getUserOrders } from "../lib/orders";
+import { cancelOrder, getUserOrders } from "../lib/orders";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@radix-ui/react-tabs";
 import { Order } from "../lib/types";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 
 export function UserOrders({ market }: { market: string }) {
+    const { getToken, userId } = useAuth();
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchOrders = async () => {
+            if (!userId) {
+                setOrders([]);
+                setIsLoading(false);
+                return;
+            }
+
             try {
-                const data = await getUserOrders(market);
+                const token = await getToken();
+                if (!token) {
+                    setOrders([]);
+                    return;
+                }
+                const data = await getUserOrders(market, token);
                 setOrders(data);
             } catch (error) {
                 console.error("Failed to fetch orders", error);
@@ -26,12 +39,23 @@ export function UserOrders({ market }: { market: string }) {
         };
 
         fetchOrders();
-    }, [market]);
+    }, [getToken, market, userId]);
 
-    const handleCancel = (orderId: string) => {
-        // Future: Call API to cancel
-        toast.success(`Order ${orderId} cancelled`);
-        setOrders(prev => prev.filter(o => o.id !== orderId));
+    const handleCancel = async (orderId: string) => {
+        try {
+            const token = await getToken();
+            if (!token) {
+                toast.error("Authentication required");
+                return;
+            }
+            await cancelOrder(orderId, market, token);
+            toast.success(`Order ${orderId} cancelled`);
+            setOrders(prev => prev.map((order) => (
+                order.id === orderId ? { ...order, status: "CANCELLED" } : order
+            )));
+        } catch (error) {
+            toast.error("Failed to cancel order");
+        }
     };
 
     if (isLoading) {

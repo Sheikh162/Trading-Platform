@@ -2,6 +2,10 @@ import { Transaction } from "@/src/lib/types";
 import { cn } from "@/src/lib/utils";
 
 export function TransactionTable({ transactions }: { transactions: Transaction[] }) {
+    if (transactions.length === 0) {
+        return <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">No transactions yet.</div>;
+    }
+
     return (
         <div className="rounded-md border">
             {transactions.map((txn) => (

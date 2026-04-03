@@ -9,6 +9,11 @@ import { AskTable } from "./AskTable";
 import { BidTable } from "./BidTable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+const ROW_HEIGHT = 22;
+const VISIBLE_ROWS_PER_SIDE = 10;
+const PRICE_ROW_HEIGHT = 28;
+const DEPTH_VIEWPORT_HEIGHT = (VISIBLE_ROWS_PER_SIDE * ROW_HEIGHT * 2) + PRICE_ROW_HEIGHT + 8;
+
 export function Depth({ market, initialBids, initialAsks }: { market: string, initialBids?: [string, string][], initialAsks?: [string, string][] }) {
     const [bids, setBids] = useState<[string, string][] | undefined>(initialBids);
     const [asks, setAsks] = useState<[string, string][] | undefined>(initialAsks);
@@ -130,14 +135,19 @@ export function Depth({ market, initialBids, initialAsks }: { market: string, in
         <Card className="w-full h-full bg-transparent border-0 ring-0 shadow-none relative">
             <CardContent className="p-0 h-full flex flex-col relative">
                 <OrderBookHeader />
-                <div className="relative flex-1 overflow-hidden">
-                    <Total ref={scrollContainerRef}>
-                        <AskTable asks={asks || []} />
-                        <div ref={priceRef} className="text-lg h-[28px] flex items-center justify-center font-medium tabular-nums tracking-[-0.02em] font-mono text-center my-1 text-[var(--color-up)]">
-                            {ticker?.lastPrice ? ticker.lastPrice : '---'}
-                        </div>
-                        <BidTable bids={bids || []} />
-                    </Total>
+                <div className="relative flex-1 overflow-hidden px-2 py-3">
+                    <div
+                        className="mx-auto flex h-full w-full max-w-sm items-center justify-center"
+                        style={{ minHeight: `${DEPTH_VIEWPORT_HEIGHT}px` }}
+                    >
+                        <Total ref={scrollContainerRef}>
+                            <AskTable asks={asks || []} />
+                            <div ref={priceRef} className="text-lg h-[28px] flex items-center justify-center font-medium tabular-nums tracking-[-0.02em] font-mono text-center my-1 text-[var(--color-up)]">
+                                {ticker?.lastPrice ? ticker.lastPrice : '---'}
+                            </div>
+                            <BidTable bids={bids || []} />
+                        </Total>
+                    </div>
                     
                     {/* Floating Recenter Button */}
                     {isScrolledOffCenter && (
@@ -166,9 +176,11 @@ function OrderBookHeader() {
 
 function Total({ children, ref }: { children: any, ref: Ref<HTMLDivElement> }) {
     return (
-        // FIXED: Replaced native div with Shadcn ScrollArea
-        // Removed max-h-[500px] and overflow-y-auto to avoid double scrolling
-        <ScrollArea ref={ref} className="h-full w-full rounded-md border-0">
+        <ScrollArea
+            ref={ref}
+            className="w-full rounded-md border border-border/50 bg-background/40"
+            style={{ height: `${DEPTH_VIEWPORT_HEIGHT}px` }}
+        >
             <div className="px-1">
                 {children}
             </div>

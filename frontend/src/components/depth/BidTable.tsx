@@ -3,13 +3,16 @@ import { motion } from "motion/react";
 const SPRING_TICKER = { type: "spring", stiffness: 500, damping: 40 } as const;
 
 export const BidTable = ({ bids }: { bids: [string, string][] }) => {
-    let currentTotal = 0;
     const MAX_ROWS = 19;
 
     const relevantBids = bids.slice(0, MAX_ROWS);
     const maxTotal = relevantBids.reduce((acc, [_, quantity]) => acc + Number(quantity), 0);
 
-    const bidsWithTotal: [string, string, number][] = relevantBids.map(([price, quantity]) => [price, quantity, currentTotal += Number(quantity)]);
+    const bidsWithTotal = relevantBids.reduce<[string, string, number][]>((rows, [price, quantity]) => {
+        const runningTotal = (rows[rows.length - 1]?.[2] ?? 0) + Number(quantity);
+        rows.push([price, quantity, runningTotal]);
+        return rows;
+    }, []);
     
     // Pad at the bottom to ensure exactly 19 elements total
     const paddedCount = MAX_ROWS - bidsWithTotal.length;

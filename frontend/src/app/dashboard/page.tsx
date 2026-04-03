@@ -5,12 +5,15 @@ import { Button } from "@/src/components/ui/button";
 import { TransactionTable } from "@/src/components/wallet/TransactionTable";
 import { getDashboardStats, getTransactions } from "@/src/lib/wallet";
 import { Wallet, TrendingUp, ArrowRight } from "lucide-react";
+import { auth } from "@clerk/nextjs/server";
 
 export default async function DashboardPage() {
+    const authData = await auth();
+    const token = authData.userId ? await authData.getToken() : null;
     // Vercel Best Practice: async-parallel
     const [stats, allTxns] = await Promise.all([
-        getDashboardStats(),
-        getTransactions()
+        getDashboardStats(token),
+        getTransactions(token)
     ]);
 
     const recentTxns = allTxns.slice(0, 3);

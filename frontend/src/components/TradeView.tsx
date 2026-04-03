@@ -97,6 +97,7 @@ export function TradeView({ market, initialData }: { market: string; initialData
   const chartRef = useRef<HTMLDivElement>(null);
   const chartManagerRef = useRef<ChartManager | null>(null);
   const [klineData, setKLineData] = useState<KLine[]>(initialData || []);
+  const shouldSkipInitialFetch = useRef((initialData?.length ?? 0) > 0);
 
   // 1. Fetch Data Interval
   useEffect(() => {
@@ -111,10 +112,10 @@ export function TradeView({ market, initialData }: { market: string; initialData
       }
     };
 
-    // If we don't have initialData, fetch immediately. Otherwise just start interval.
-    if (klineData.length === 0) {
-      fetchData();
+    if (!shouldSkipInitialFetch.current) {
+      void fetchData();
     }
+    shouldSkipInitialFetch.current = false;
     const interval = setInterval(fetchData, 10_000);
     return () => clearInterval(interval);
   }, [market]);

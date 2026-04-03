@@ -26,7 +26,7 @@ export function HoldingsTable({ assets }: { assets: Asset[] }) {
                     </div>
                     <div className="text-right font-mono tabular-nums">{asset.balance}</div>
                     <div className="text-right font-mono tabular-nums">
-                        <div>₹{asset.value}</div>
+                        <div>{asset.value}</div>
                         <div className={cn("text-xs font-sans", asset.unrealizedPnL.startsWith("+") ? "text-[var(--color-up)]" : "text-[var(--color-down)]")}>
                             {asset.unrealizedPnLValue} ({asset.unrealizedPnL})
                         </div>

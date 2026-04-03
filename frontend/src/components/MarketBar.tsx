@@ -5,6 +5,7 @@ import { Ticker } from "@/src/lib/types";
 import { cn } from "@/src/lib/utils";
 import { NavigationMenu, NavigationMenuList, NavigationMenuItem } from "@radix-ui/react-navigation-menu";
 import { useState, useEffect } from "react";
+import Image from "next/image";
 
 
 export const MarketBar = ({ market, initialTicker }: { market: string; initialTicker?: Ticker | null }) => {
@@ -84,14 +85,11 @@ function TickerComponent({ market }: { market: string }) {
     return (
         <div className="flex items-center gap-3 select-none">
             <div className="relative flex items-center justify-center h-8 w-8 rounded-full bg-secondary/20 ring-1 ring-border overflow-hidden">
-                <img
+                <Image
                     alt={`${market} Icon`}
-                    className="h-full w-full object-cover"
+                    className="object-cover"
+                    fill
                     src="/btc-icon.png" // Using the local asset path as requested
-                    onError={(e) => {
-                        // Fallback if image fails to load
-                        (e.target as HTMLImageElement).style.display = 'none';
-                    }}
                 />
                 {/* Fallback Text if Image Fails (hidden by default) */}
                 <span className="absolute text-[10px] font-medium text-foreground">
@@ -109,4 +107,3 @@ function TickerComponent({ market }: { market: string }) {
         </div>
     );
 }
-

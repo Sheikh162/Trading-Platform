@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Sparkline } from "./Sparkline";
 import { Market } from "../lib/types";
 
@@ -57,11 +58,12 @@ export const Markets = ({ initialMarkets }: { initialMarkets: Market[] }) => {
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    {/* Ensure you are using 'market.image' as defined in types */}
-                    <img
+                    <Image
                       src={market.image}
                       alt={market.name}
-                      className="w-8 h-8 rounded-full"
+                      width={32}
+                      height={32}
+                      className="rounded-full"
                     />
                     <div>
                       <div className="font-medium">{market.name}</div>

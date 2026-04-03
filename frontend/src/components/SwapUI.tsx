@@ -41,11 +41,33 @@ export function SwapUI({ market, initialBalance }: { market: string; initialBala
   };
 
   useEffect(() => {
-    // We already have initialBalance, so we only fetch again if balance is null
-    if (userId && balance === null) {
-      fetchBalance();
+    let cancelled = false;
+
+    const loadBalance = async () => {
+      if (!userId || balance !== null) {
+        return;
+      }
+
+      try {
+        const token = (await getToken()) as string;
+        const balanceValue = await getBalance(userId, token);
+        if (!cancelled) {
+          setBalance(balanceValue);
+        }
+      } catch (err) {
+        console.error("Failed to fetch balance ", err);
+        if (!cancelled) {
+          setBalance("0");
+        }
+      }
+    };
+
+    void loadBalance();
+
+    return () => {
+      cancelled = true;
     }
-  }, [userId]);
+  }, [balance, getToken, userId]);
 
   const handleSubmit = async () => {
     if (!userId) return;

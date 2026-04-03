@@ -49,3 +49,5 @@ Desktop.ini
 # Testing
 coverage/
 .vitest-result/
+
+/notes

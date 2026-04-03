@@ -10,6 +10,7 @@ RUN pnpm install --filter db... --frozen-lockfile
 
 COPY db/tsconfig.json ./db/tsconfig.json
 COPY db/src ./db/src
+COPY db/migrations ./db/migrations
 
 RUN pnpm --filter db run build
 
@@ -25,6 +26,7 @@ COPY db/package.json ./db/package.json
 RUN pnpm install --filter db --prod --frozen-lockfile
 
 COPY --from=builder /app/db/dist ./db/dist
+COPY --from=builder /app/db/migrations ./db/migrations
 
 WORKDIR /app/db
 CMD ["node", "dist/index.js"]

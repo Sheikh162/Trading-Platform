@@ -1,59 +1,170 @@
-import { Client } from "pg";
 import { Router } from "express";
-
-const pgClient = new Client({
-  user: process.env.POSTGRES_USER,
-  host: process.env.POSTGRES_HOST,
-  database: process.env.POSTGRES_DB,
-  password: process.env.POSTGRES_PASSWORD,
-  port: Number(process.env.POSTGRES_PORT),
-});
-
-pgClient.connect();
+import { pgPool } from "../db";
 
 export const klineRouter = Router();
 
-klineRouter.get("/", async (req, res) => {
-  const { symbol, interval, startTime, endTime } = req.query;
-
-  let query;
+function getBucketExpression(interval: string, column: string) {
   switch (interval) {
     case "1m":
-      query = `SELECT * FROM klines_1m WHERE bucket >= $1 AND bucket <= $2 AND currency_code = $3`;
-      break;
+      return `date_trunc('minute', ${column})`;
     case "1h":
-      query = `SELECT * FROM klines_1h WHERE bucket >= $1 AND bucket <= $2 AND currency_code = $3`;
-      break;
+      return `date_trunc('hour', ${column})`;
     case "1w":
-      query = `SELECT * FROM klines_1w WHERE bucket >= $1 AND bucket <= $2 AND currency_code = $3`;
-      break;
+      return `date_trunc('week', ${column})`;
     default:
-      return res.status(400).send("Invalid interval");
+      return null;
+  }
+}
+
+klineRouter.get("/", async (req, res) => {
+  const symbol = String(req.query.symbol || req.query.market || "");
+  const interval = String(req.query.interval || "");
+  const startTime = Number(req.query.startTime);
+  const endTime = Number(req.query.endTime);
+
+  if (!symbol) {
+    return res.status(400).json({ message: "symbol is required" });
   }
 
-  try {
-    //@ts-ignore
-    const result = await pgClient.query(query, [
-      new Date(Number(startTime) * 1000),
-      new Date(Number(endTime) * 1000),
-      symbol,
-    ]);
+  const bucketExpression = getBucketExpression(interval, "executed_at");
+  if (!bucketExpression) {
+    return res.status(400).send("Invalid interval");
+  }
 
-    res.json(
-      result.rows.map((x) => ({
-        close: x.close,
-        end: x.bucket, // TradingView uses the start time as the key usually
-        high: x.high,
-        low: x.low,
-        open: x.open,
-        // quoteVolume: x.quoteVolume, // REMOVED: View doesn't have this
-        start: x.bucket,
-        // trades: x.trades, // REMOVED: View doesn't have this
-        volume: x.volume,
+  const start = new Date(startTime * 1000);
+  const end = new Date(endTime * 1000);
+
+  try {
+    const fillsResult = await pgPool.query(
+      `
+        WITH fills AS (
+          SELECT
+            ${bucketExpression} AS bucket,
+            executed_at,
+            price::numeric AS price,
+            quantity::numeric AS volume
+          FROM trade_fills
+          WHERE market_symbol = $1
+            AND executed_at >= $2
+            AND executed_at <= $3
+        ),
+        open_prices AS (
+          SELECT DISTINCT ON (bucket)
+            bucket,
+            price AS open
+          FROM fills
+          ORDER BY bucket, executed_at ASC
+        ),
+        close_prices AS (
+          SELECT DISTINCT ON (bucket)
+            bucket,
+            price AS close
+          FROM fills
+          ORDER BY bucket, executed_at DESC
+        ),
+        aggregates AS (
+          SELECT
+            bucket,
+            MAX(price) AS high,
+            MIN(price) AS low,
+            SUM(volume) AS volume
+          FROM fills
+          GROUP BY bucket
+        )
+        SELECT
+          a.bucket,
+          o.open::text AS open,
+          a.high::text AS high,
+          a.low::text AS low,
+          c.close::text AS close,
+          a.volume::text AS volume
+        FROM aggregates a
+        JOIN open_prices o ON o.bucket = a.bucket
+        JOIN close_prices c ON c.bucket = a.bucket
+        ORDER BY a.bucket ASC
+      `,
+      [symbol, start, end],
+    );
+
+    if (fillsResult.rows.length > 0) {
+      return res.json(
+        fillsResult.rows.map((row) => ({
+          close: row.close,
+          end: row.bucket,
+          high: row.high,
+          low: row.low,
+          open: row.open,
+          start: row.bucket,
+          volume: row.volume,
+        })),
+      );
+    }
+
+    const tradesBucketExpression = getBucketExpression(interval, "time");
+    const tradesResult = await pgPool.query(
+      `
+        WITH trades_source AS (
+          SELECT
+            ${tradesBucketExpression} AS bucket,
+            time,
+            price::numeric AS price,
+            volume::numeric AS volume
+          FROM trades
+          WHERE currency_code = $1
+            AND time >= $2
+            AND time <= $3
+        ),
+        open_prices AS (
+          SELECT DISTINCT ON (bucket)
+            bucket,
+            price AS open
+          FROM trades_source
+          ORDER BY bucket, time ASC
+        ),
+        close_prices AS (
+          SELECT DISTINCT ON (bucket)
+            bucket,
+            price AS close
+          FROM trades_source
+          ORDER BY bucket, time DESC
+        ),
+        aggregates AS (
+          SELECT
+            bucket,
+            MAX(price) AS high,
+            MIN(price) AS low,
+            SUM(volume) AS volume
+          FROM trades_source
+          GROUP BY bucket
+        )
+        SELECT
+          a.bucket,
+          o.open::text AS open,
+          a.high::text AS high,
+          a.low::text AS low,
+          c.close::text AS close,
+          a.volume::text AS volume
+        FROM aggregates a
+        JOIN open_prices o ON o.bucket = a.bucket
+        JOIN close_prices c ON c.bucket = a.bucket
+        ORDER BY a.bucket ASC
+      `,
+      [symbol, start, end],
+    );
+
+    return res.json(
+      tradesResult.rows.map((row) => ({
+        close: row.close,
+        end: row.bucket,
+        high: row.high,
+        low: row.low,
+        open: row.open,
+        start: row.bucket,
+        volume: row.volume,
       })),
     );
   } catch (err) {
     console.log(err);
-    res.status(500).send(err);
+    return res.status(500).json([]);
   }
 });

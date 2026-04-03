@@ -51,31 +51,39 @@ async function main() {
     const totalBids = openBidsData.length;
     const totalAsks = openAsksData.length;
 
+    console.log(`[mm] cycle start market=${MARKET} targetPrice=${price.toFixed(2)} openBids=${totalBids} openAsks=${totalAsks}`);
+
     const cancelledBids = await cancelBidsMoreThan(openBidsData, price);
     const cancelledAsks = await cancelAsksLessThan(openAsksData, price);
     
     let bidsToAdd = TOTAL_BIDS - (totalBids - cancelledBids);
     let asksToAdd = TOTAL_ASK - (totalAsks - cancelledAsks);
 
+    console.log(`[mm] cycle summary cancelledBids=${cancelledBids} cancelledAsks=${cancelledAsks} bidsToAdd=${bidsToAdd} asksToAdd=${asksToAdd}`);
+
     while(bidsToAdd > 0 || asksToAdd > 0) {
         if (bidsToAdd > 0) {
-            await apiClient.post(`/api/v1/order`, {
+            const bidPrice = (price - Math.random() * 1).toFixed(1).toString();
+            const response = await apiClient.post(`/api/v1/order`, {
                 market: MARKET,
-                price: (price - Math.random() * 1).toFixed(1).toString(),
+                price: bidPrice,
                 quantity: "1",
                 side: "buy",
                 userId: BUY_USER_ID
             });
+            console.log(`[mm] placed buy order user=${BUY_USER_ID} price=${bidPrice} orderId=${response.data?.orderId ?? "unknown"}`);
             bidsToAdd--;
         }
         if (asksToAdd > 0) {
-            await apiClient.post(`/api/v1/order`, {
+            const askPrice = (price + Math.random() * 1).toFixed(1).toString();
+            const response = await apiClient.post(`/api/v1/order`, {
                 market: MARKET,
-                price: (price + Math.random() * 1).toFixed(1).toString(),
+                price: askPrice,
                 quantity: "1",
                 side: "sell",
                 userId: SELL_USER_ID
             });
+            console.log(`[mm] placed sell order user=${SELL_USER_ID} price=${askPrice} orderId=${response.data?.orderId ?? "unknown"}`);
             asksToAdd--;
         }
     }
@@ -88,10 +96,15 @@ async function main() {
 async function cancelBidsMoreThan(openOrders: any[], price: number) {
     let promises: any[] = [];
     openOrders.map(o => {
+        if (!o?.id) {
+            console.log(`[mm] skipping malformed buy order payload ${JSON.stringify(o)}`);
+            return;
+        }
         if (o.side === "buy" && (o.price > price || Math.random() < 0.5)) {
+            console.log(`[mm] cancelling buy orderId=${o.id} price=${o.price}`);
             promises.push(apiClient.delete(`/api/v1/order`, {
                 data: {
-                    orderId: o.orderId,
+                    orderId: o.id,
                     market: MARKET
                 }
             }));
@@ -104,10 +117,15 @@ async function cancelBidsMoreThan(openOrders: any[], price: number) {
 async function cancelAsksLessThan(openOrders: any[], price: number) {
     let promises: any[] = [];
     openOrders.map(o => {
+        if (!o?.id) {
+            console.log(`[mm] skipping malformed sell order payload ${JSON.stringify(o)}`);
+            return;
+        }
         if (o.side === "sell" && (o.price < price || Math.random() < 0.5)) {
+            console.log(`[mm] cancelling sell orderId=${o.id} price=${o.price}`);
             promises.push(apiClient.delete(`/api/v1/order`, {
                 data: {
-                    orderId: o.orderId,
+                    orderId: o.id,
                     market: MARKET
                 }
             }));
@@ -312,4 +330,3 @@ main();
 // }
 
 // main();
-

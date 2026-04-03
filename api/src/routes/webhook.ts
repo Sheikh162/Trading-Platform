@@ -3,20 +3,10 @@ import { Webhook } from "svix";
 import bodyParser from "body-parser";
 import { RedisManager } from "../RedisManager";
 import "dotenv/config";
-//import { Client } from "pg"; // Ensure you have your DB client set up
+import { pgPool } from "../db";
 
 export const webhookRouter = express.Router();
 const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
-
-// Postgres Client (Replace with your actual DB connection/Prisma client)
-// const db = new Client({
-//     user: process.env.DB_USER,
-//     host: process.env.DB_HOST,
-//     database: process.env.DB_NAME,
-//     password: process.env.DB_PASSWORD,
-//     port: Number(process.env.DB_PORT),
-// });
-// db.connect();
 
 webhookRouter.post(
   "/clerk",
@@ -78,8 +68,30 @@ webhookRouter.post(
       //const email = evt.data.email_addresses[0]?.email_address;
 
       try {
-        // A. Create in Database (Postgres)
-        //await db.query("INSERT INTO users (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING", [userId, email]);
+        const email =
+          evt.data.email_addresses?.[0]?.email_address ??
+          evt.data.primary_email_address?.email_address ??
+          null;
+
+        await pgPool.query(
+          `
+            INSERT INTO users (id, email)
+            VALUES ($1, $2)
+            ON CONFLICT (id) DO UPDATE
+            SET email = COALESCE(EXCLUDED.email, users.email)
+          `,
+          [userId, email],
+        );
+
+        await pgPool.query(
+          `
+            INSERT INTO balances (user_id, asset, available, locked)
+            SELECT $1, symbol, 0, 0
+            FROM assets
+            ON CONFLICT (user_id, asset) DO NOTHING
+          `,
+          [userId],
+        );
 
         // B. Notify Engine (Redis) - Fire and Forget!
         RedisManager.getInstance().pushMessage({

@@ -7,6 +7,9 @@ import { depthRouter } from "./routes/depth";
 import { tradesRouter } from "./routes/trades";
 import { klineRouter } from "./routes/kline";
 import { tickersRouter } from "./routes/ticker";
+import { walletRouter } from "./routes/wallet";
+import { portfolioRouter } from "./routes/portfolio";
+import { marketsRouter } from "./routes/markets";
 import { clerkMiddleware } from "@clerk/express";
 
 const app = express();
@@ -18,6 +21,9 @@ app.use(express.json());
 app.use(clerkMiddleware());
 
 app.use("/api/v1/order", orderRouter);
+app.use("/api/v1/wallet", walletRouter);
+app.use("/api/v1/portfolio", portfolioRouter);
+app.use("/api/v1/markets", marketsRouter);
 app.use("/api/v1/depth", depthRouter);
 app.use("/api/v1/klines", klineRouter);
 // write code for below 2 later

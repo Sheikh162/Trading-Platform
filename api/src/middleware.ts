@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { strict as assert } from "assert";
+import { ensureUserExists, pgPool } from "./db";
 
 // Extend the Express Request type to include userId
 declare global {
@@ -18,13 +19,18 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     if (adminSecret && adminSecret === process.env.ADMIN_SECRET) {
         // Trusted Bot Mode: Allow the bot to specify the userId in the body
         // This is necessary because your MM script simulates two different users (2 and 5)
-        if (req.body.userId) {
-            req.userId = req.body.userId;
+        const requestedUserId =
+            req.body?.userId ||
+            (typeof req.query.userId === "string" ? req.query.userId : undefined);
+
+        if (requestedUserId) {
+            req.userId = requestedUserId;
         } else {
             // Default Bot ID if none provided
             req.userId = "bot_market_maker";
         }
         req.role = "bot";
+        await ensureUserExists(pgPool, req.userId as string);
         next();
         return;
     }
@@ -52,6 +58,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 
         req.userId = auth.userId;
         req.role = "user";
+        await ensureUserExists(pgPool, req.userId as string);
         next();
     } catch (e) {
         res.status(401).json({ message: "Invalid Token" });

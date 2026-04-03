@@ -1,180 +1,42 @@
-# Trading Engine Service
+# Engine Service
 
-The Trading Engine is the core component of the trading platform, responsible for order matching, trade execution, and maintaining order books for different markets.
+This service is the in-memory matching engine. It owns live orderbooks, matches buy and sell orders using price-time priority, manages balance locks during runtime, and publishes market events.
 
-## Overview
+For full architecture and system-level behavior, see the [root README](../README.md).
 
-This service processes trading orders, matches buy and sell orders, executes trades, and maintains real-time order books. It handles all the core trading logic including order validation, balance management, and market data publishing.
+## Responsibilities
 
-## Features
+- maintain live orderbooks per market
+- process create/cancel/depth/balance commands from the API
+- enforce basic balance locking before order placement
+- execute trades and partial fills
+- publish ticker, trade, and depth updates
+- emit persistence events for the DB worker
+- restore balances and open orders from Postgres on startup
 
-- **Order Matching**: Advanced order matching engine with price-time priority
-- **Order Book Management**: Maintains separate order books for different markets
-- **Balance Management**: Tracks user balances and handles fund locking/unlocking
-- **Trade Execution**: Executes matched orders and updates balances
-- **Real-time Updates**: Publishes market data via Redis pub/sub
-- **Persistence**: Automatic state snapshots for recovery
-- **Multi-market Support**: Handles multiple trading pairs
+## Main Components
 
-## Core Components
+- `src/trade/Engine.ts`: orchestration and command handling
+- `src/trade/Orderbook.ts`: per-market book and matching logic
+- `src/RedisManager.ts`: Redis queue/pub-sub integration
+- `src/index.ts`: service entrypoint and startup hydration
+- `src/tests/`: engine and orderbook tests
 
-### 1. Engine (`Engine.ts`)
-The main trading engine that orchestrates all trading operations:
-- Processes incoming orders from the API
-- Manages order books for different markets
-- Handles user balance tracking
-- Executes trade matching logic
-- Publishes real-time market data
-
-### 2. Orderbook (`Orderbook.ts`)
-Manages individual market order books:
-- Maintains bid and ask order lists
-- Implements price-time priority matching
-- Handles order placement and cancellation
-- Calculates market depth data
-- Tracks trade execution
-
-### 3. Redis Manager (`RedisManager.ts`)
-Handles communication with other services:
-- Receives orders from API service
-- Publishes trade and depth updates
-- Manages message queues
-- Handles pub/sub for real-time data
-
-## Supported Operations
-
-### Order Management
-- **CREATE_ORDER**: Place new buy/sell orders
-- **CANCEL_ORDER**: Cancel existing orders
-- **GET_OPEN_ORDERS**: Retrieve user's open orders
-- **GET_BALANCE**: Get user account balance
-
-### Market Data
-- **GET_DEPTH**: Retrieve order book depth
-- **Trade Publishing**: Real-time trade execution updates
-- **Depth Updates**: Order book changes
-- **Ticker Updates**: Price change notifications
-
-## Order Matching Algorithm
-
-The engine uses a price-time priority matching system:
-
-1. **Price Priority**: Orders with better prices execute first
-2. **Time Priority**: Among orders with the same price, earlier orders execute first
-3. **Partial Fills**: Orders can be partially filled across multiple counterparties
-4. **Market Orders**: Execute immediately at best available price
-5. **Limit Orders**: Execute only at specified price or better
-
-## Balance Management
-
-### User Balance Structure
-```typescript
-interface UserBalance {
-  [asset: string]: {
-    available: number;  // Available for trading
-    locked: number;     // Locked in open orders
-  }
-}
-```
-
-### Balance Operations
-- **Fund Locking**: Locks funds when orders are placed
-- **Fund Unlocking**: Releases funds when orders are cancelled
-- **Balance Updates**: Updates balances after trade execution
-- **On-ramp Support**: Adds funds to user accounts
-
-## Market Data Publishing
-
-The engine publishes real-time data via Redis channels:
-
-### Trade Updates (`trade@{market}`)
-```json
-{
-  "stream": "trade@BTC_USDT",
-  "data": {
-    "e": "trade",
-    "t": 12345,
-    "m": false,
-    "p": "50000.50",
-    "q": "0.1",
-    "s": "BTC_USDT"
-  }
-}
-```
-
-### Depth Updates (`depth@{market}`)
-```json
-{
-  "stream": "depth@BTC_USDT",
-  "data": {
-    "a": [["50001.00", "0.5"]],  // Asks
-    "b": [["50000.00", "0.3"]],  // Bids
-    "e": "depth"
-  }
-}
-```
-
-## State Persistence
-
-### Snapshot System
-- **Automatic Snapshots**: Saves state every 3 seconds
-- **Recovery Support**: Restores from snapshots on startup
-- **Order Book State**: Preserves all open orders
-- **Balance State**: Maintains user balances
-- **Trade History**: Tracks executed trades
-
-## Dependencies
-
-- **Redis**: Message queue and pub/sub communication
-- **Node.js**: Runtime environment
-- **TypeScript**: Type-safe development
-- **Vitest**: Testing framework
-
-## Environment Variables
-
-- `REDIS_URL`: Redis connection URL
-- `REDIS_HOST`: Redis host (default: localhost)
-- `REDIS_PORT`: Redis port (default: 6379)
-- `WITH_SNAPSHOT`: Enable snapshot persistence (default: true)
-- `SNAPSHOT_FILE`: Snapshot file path (default: ./snapshot.json)
-
-## Development
-
-### Prerequisites
-- Node.js 20+
-- pnpm 10.32.1 (Enable with `corepack enable`)
-- Redis server
-- API service for order input
-
-### Running the Service
+## Run Locally
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Build TypeScript
-pnpm run build
-
-# Start the engine
-pnpm start
-
-# Development mode (build + start)
-pnpm run dev
-
-# Run tests
-pnpm test
+pnpm -C engine build
+pnpm -C engine start
 ```
 
-### Project Structure
+Development mode:
 
+```bash
+pnpm -C engine dev
 ```
-src/
-├── index.ts              # Main engine entry point
-├── RedisManager.ts       # Redis communication
-├── trade/                # Core trading logic
-│   ├── Engine.ts        # Main trading engine
-│   ├── Orderbook.ts     # Order book management
-│   └── events.ts        # Event definitions
-├── types/                # TypeScript definitions
-└── tests/                # Test files
+
+Run tests:
+
+```bash
+pnpm -C engine test --run
 ```

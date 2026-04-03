@@ -1,15 +1,22 @@
 import { Router } from "express";
+import type { PoolClient } from "pg";
 import { authMiddleware } from "../middleware";
 import { ensureUserExists, pgPool, withTransaction } from "../db";
 import { RedisManager } from "../RedisManager";
 import { ON_RAMP, WITHDRAW } from "../types";
+import {
+  parseAsset,
+  parseOptionalString,
+  parsePositiveInteger,
+  parsePositiveNumber,
+} from "../validation";
 
 export const walletRouter = Router();
 
 walletRouter.use(authMiddleware);
 
 async function ensureBalanceRow(
-  client: import("pg").PoolClient,
+  client: PoolClient,
   userId: string,
   asset: string,
 ) {
@@ -45,7 +52,16 @@ walletRouter.get("/balances", async (req, res) => {
 
 walletRouter.get("/transactions", async (req, res) => {
   const userId = req.userId as string;
-  const limit = Math.min(Number(req.query.limit || 50), 100);
+  const parsedLimit = parsePositiveInteger(req.query.limit, "limit", {
+    defaultValue: 50,
+    min: 1,
+    max: 100,
+  });
+  if (!parsedLimit.success) {
+    return res.status(400).json({ message: parsedLimit.message });
+  }
+
+  const limit = parsedLimit.data;
 
   const result = await pgPool.query(
     `
@@ -195,12 +211,19 @@ walletRouter.get("/summary", async (req, res) => {
 
 walletRouter.post("/deposits", async (req, res) => {
   const userId = req.userId as string;
-  const asset = String(req.body.asset || "USDT").toUpperCase();
-  const amount = Number(req.body.amount);
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return res.status(400).json({ message: "Amount must be greater than zero" });
+  const parsedAsset = parseAsset(req.body.asset);
+  if (!parsedAsset.success) {
+    return res.status(400).json({ message: parsedAsset.message });
   }
+
+  const parsedAmount = parsePositiveNumber(req.body.amount, "amount");
+  if (!parsedAmount.success) {
+    return res.status(400).json({ message: parsedAmount.message });
+  }
+
+  const asset = parsedAsset.data;
+  const amount = parsedAmount.data;
+  const provider = parseOptionalString(req.body.provider) ?? "manual";
 
   const deposit = await withTransaction(async (client) => {
     await ensureBalanceRow(client, userId, asset);
@@ -215,7 +238,7 @@ walletRouter.post("/deposits", async (req, res) => {
         userId,
         asset,
         amount,
-        req.body.provider || "manual",
+        provider,
         `dep_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
         JSON.stringify({ details: `${asset} deposit` }),
       ],
@@ -273,12 +296,20 @@ walletRouter.post("/deposits", async (req, res) => {
 
 walletRouter.post("/withdrawals", async (req, res) => {
   const userId = req.userId as string;
-  const asset = String(req.body.asset || "USDT").toUpperCase();
-  const amount = Number(req.body.amount);
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return res.status(400).json({ message: "Amount must be greater than zero" });
+  const parsedAsset = parseAsset(req.body.asset);
+  if (!parsedAsset.success) {
+    return res.status(400).json({ message: parsedAsset.message });
   }
+
+  const parsedAmount = parsePositiveNumber(req.body.amount, "amount");
+  if (!parsedAmount.success) {
+    return res.status(400).json({ message: parsedAmount.message });
+  }
+
+  const asset = parsedAsset.data;
+  const amount = parsedAmount.data;
+  const destinationType = parseOptionalString(req.body.destinationType) ?? "manual";
+  const destinationRef = parseOptionalString(req.body.destinationRef) ?? null;
 
   try {
     const withdrawal = await withTransaction(async (client) => {
@@ -312,8 +343,8 @@ walletRouter.post("/withdrawals", async (req, res) => {
           userId,
           asset,
           amount,
-          req.body.destinationType || "manual",
-          req.body.destinationRef || null,
+          destinationType,
+          destinationRef,
           `wd_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
           JSON.stringify({ details: `${asset} withdrawal completed` }),
         ],

@@ -1,14 +1,16 @@
 import { Router } from "express";
 import { pgPool } from "../db";
+import { parseMarket } from "../validation";
 
 export const tradesRouter = Router();
 
 tradesRouter.get("/", async (req, res) => {
-  const market = String(req.query.market || req.query.symbol || "");
-
-  if (!market) {
-    return res.status(400).json({ message: "market is required" });
+  const parsedMarket = parseMarket(req.query.market || req.query.symbol);
+  if (!parsedMarket.success) {
+    return res.status(400).json({ message: parsedMarket.message });
   }
+
+  const market = parsedMarket.data;
 
   try {
     const fillsResult = await pgPool.query(

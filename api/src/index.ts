@@ -12,7 +12,7 @@ import { portfolioRouter } from "./routes/portfolio";
 import { marketsRouter } from "./routes/markets";
 import { clerkMiddleware } from "@clerk/express";
 
-const app = express();
+export const app = express();
 app.use(cors());
 
 app.use("/api/v1/webhooks", webhookRouter);
@@ -30,5 +30,7 @@ app.use("/api/v1/klines", klineRouter);
 app.use("/api/v1/tickers", tickersRouter); //for this handled using websockets, so not needed using api
 app.use("/api/v1/trades", tradesRouter);
 
-app.listen(process.env.PORT);
-console.log(`Listening on port ${process.env.PORT}`);
+if (process.env.NODE_ENV !== "test") {
+  app.listen(process.env.PORT);
+  console.log(`Listening on port ${process.env.PORT}`);
+}

@@ -12,7 +12,8 @@
     "dev:api": "pnpm --filter api run dev",
     "dev:ws": "pnpm --filter ws run dev",
     "dev:mm": "pnpm --filter mm run dev",
-    "dev:frontend": "pnpm --filter frontend run dev"
+    "dev:frontend": "pnpm --filter frontend run dev",
+    "test:integration": "node scripts/integration-flow.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"

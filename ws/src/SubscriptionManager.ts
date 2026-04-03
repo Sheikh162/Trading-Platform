@@ -6,12 +6,21 @@ export class SubscriptionManager {
     private subscriptions: Map<string, string[]> = new Map();
     private reverseSubscriptions: Map<string, string[]> = new Map();
     private redisClient: RedisClientType;
+    private connection: Promise<void>;
 
     private constructor() {
         const redisUrl = process.env.REDIS_URL 
         || `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`;
         this.redisClient = createClient({ url: redisUrl });
-        this.redisClient.connect();
+        this.redisClient.on("error", (error) => {
+            console.error("WebSocket Redis error:", error);
+        });
+        this.connection = this.redisClient
+            .connect()
+            .then(() => undefined)
+            .catch((error) => {
+                console.error("Failed to connect WebSocket service to Redis:", error);
+            });
     }
 
     public static getInstance() {
@@ -29,8 +38,11 @@ export class SubscriptionManager {
         this.subscriptions.set(userId, (this.subscriptions.get(userId) || []).concat(subscription));
         this.reverseSubscriptions.set(subscription, (this.reverseSubscriptions.get(subscription) || []).concat(userId));
         if (this.reverseSubscriptions.get(subscription)?.length === 1) {
-
-            this.redisClient.subscribe(subscription, this.redisCallbackHandler);
+            void this.connection
+                .then(() => this.redisClient.subscribe(subscription, this.redisCallbackHandler))
+                .catch((error) => {
+                    console.error(`Failed to subscribe to Redis channel ${subscription}:`, error);
+                });
         }
     }
 
@@ -49,7 +61,11 @@ export class SubscriptionManager {
             this.reverseSubscriptions.set(subscription, reverseSubscriptions.filter(s => s !== userId));
             if (this.reverseSubscriptions.get(subscription)?.length === 0) {
                 this.reverseSubscriptions.delete(subscription);
-                this.redisClient.unsubscribe(subscription);
+                void this.connection
+                    .then(() => this.redisClient.unsubscribe(subscription))
+                    .catch((error) => {
+                        console.error(`Failed to unsubscribe from Redis channel ${subscription}:`, error);
+                    });
             }
         }
     }

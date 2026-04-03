@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pgPool } from "../db";
+import { parseKlineInterval, parseKlineWindow, parseMarket } from "../validation";
 
 export const klineRouter = Router();
 
@@ -17,22 +18,26 @@ function getBucketExpression(interval: string, column: string) {
 }
 
 klineRouter.get("/", async (req, res) => {
-  const symbol = String(req.query.symbol || req.query.market || "");
-  const interval = String(req.query.interval || "");
-  const startTime = Number(req.query.startTime);
-  const endTime = Number(req.query.endTime);
-
-  if (!symbol) {
-    return res.status(400).json({ message: "symbol is required" });
+  const parsedMarket = parseMarket(req.query.symbol || req.query.market, "symbol");
+  if (!parsedMarket.success) {
+    return res.status(400).json({ message: parsedMarket.message });
   }
 
+  const parsedInterval = parseKlineInterval(req.query.interval);
+  if (!parsedInterval.success) {
+    return res.status(400).json({ message: parsedInterval.message });
+  }
+
+  const parsedWindow = parseKlineWindow(req.query.startTime, req.query.endTime);
+  if (!parsedWindow.success) {
+    return res.status(400).json({ message: parsedWindow.message });
+  }
+
+  const symbol = parsedMarket.data;
+  const interval = parsedInterval.data;
   const bucketExpression = getBucketExpression(interval, "executed_at");
-  if (!bucketExpression) {
-    return res.status(400).send("Invalid interval");
-  }
-
-  const start = new Date(startTime * 1000);
-  const end = new Date(endTime * 1000);
+  const start = new Date(parsedWindow.data.startTime * 1000);
+  const end = new Date(parsedWindow.data.endTime * 1000);
 
   try {
     const fillsResult = await pgPool.query(

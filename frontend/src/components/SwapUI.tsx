@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/src/components/ui/card";
 import {
@@ -14,7 +14,22 @@ import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
 import { getBalance } from "../lib/httpClient";
 
-const initialOrder = {
+type OrderDraft = {
+  market: string;
+  price: string;
+  quantity: string;
+  side: "buy" | "sell";
+};
+
+type OrderPanelProps = {
+  type: "buy" | "sell";
+  order: OrderDraft;
+  setOrder: Dispatch<SetStateAction<OrderDraft>>;
+  onSubmit: () => Promise<void>;
+  balance: string | null;
+};
+
+const initialOrder: OrderDraft = {
   market: "",
   price: "",
   quantity: "",
@@ -22,10 +37,9 @@ const initialOrder = {
 };
 
 export function SwapUI({ market, initialBalance }: { market: string; initialBalance?: string | null }) {
-  const { userId, getToken } = useAuth(); // 2. Get the current user
+  const { userId, getToken } = useAuth();
   const [order, setOrder] = useState({ ...initialOrder, market });
-  // Changed state to handle a string or null
-  const [balance, setBalance] = useState<string | null>(initialBalance || null); // also display how many btc stacks user has later
+  const [balance, setBalance] = useState<string | null>(initialBalance || null);
   
   const fetchBalance = async () => {
     if (!userId) return;
@@ -33,7 +47,6 @@ export function SwapUI({ market, initialBalance }: { market: string; initialBala
       const token = (await getToken()) as string;
       const balanceValue = await getBalance(userId, token);
       setBalance(balanceValue);
-      console.log("Balance updated:", balanceValue);
     } catch (err) {
       console.error("Failed to fetch balance ", err);
       setBalance("0");
@@ -86,7 +99,7 @@ export function SwapUI({ market, initialBalance }: { market: string; initialBala
       //   },
       // );
 
-      const res = await axios.post(
+      await axios.post(
         `/api/proxy?endpoint=order`, 
         {
           ...order,
@@ -99,7 +112,6 @@ export function SwapUI({ market, initialBalance }: { market: string; initialBala
         },
       );
       await fetchBalance();
-      console.log("Order placed ", res.data);
     } catch (err) {
       console.error("Order failed ", err);
     }
@@ -149,7 +161,7 @@ export function SwapUI({ market, initialBalance }: { market: string; initialBala
   );
 }
 
-function OrderPanel({ type, order, setOrder, onSubmit, balance }: any) {
+function OrderPanel({ type, order, setOrder, onSubmit, balance }: OrderPanelProps) {
   return (
     <CardContent className="p-3 space-y-3">
       <BalanceDisplay balance={balance} />

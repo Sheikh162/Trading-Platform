@@ -3,21 +3,48 @@ import { RedisManager } from "../RedisManager";
 import { CREATE_ORDER, CANCEL_ORDER, GET_BALANCE } from "../types";
 import { authMiddleware } from "../middleware";
 import { pgPool } from "../db";
+import {
+    parseAsset,
+    parseMarket,
+    parseOptionalMarket,
+    parseOrderSide,
+    parsePositiveNumberString,
+    parseRequiredString,
+} from "../validation";
 
 export const orderRouter = Router();
 
 orderRouter.use(authMiddleware)
 
 orderRouter.post("/", async (req, res) => {
-    const { market, price, quantity, side } = req.body; // we extracted userId from here before
+    const parsedMarket = parseMarket(req.body.market);
+    if (!parsedMarket.success) {
+        return res.status(400).json({ message: parsedMarket.message });
+    }
+
+    const parsedPrice = parsePositiveNumberString(req.body.price, "price");
+    if (!parsedPrice.success) {
+        return res.status(400).json({ message: parsedPrice.message });
+    }
+
+    const parsedQuantity = parsePositiveNumberString(req.body.quantity, "quantity");
+    if (!parsedQuantity.success) {
+        return res.status(400).json({ message: parsedQuantity.message });
+    }
+
+    const parsedSide = parseOrderSide(req.body.side);
+    if (!parsedSide.success) {
+        return res.status(400).json({ message: parsedSide.message });
+    }
+
     const userId: string = req.userId as string
     const response = await RedisManager.getInstance().sendAndAwait({
         type: CREATE_ORDER,
         data: {
-            market,
-            price,
-            quantity,
-            side,
+            market: parsedMarket.data,
+            price: parsedPrice.data,
+            quantity: parsedQuantity.data,
+            side: parsedSide.data,
             userId
         }
     });
@@ -25,12 +52,21 @@ orderRouter.post("/", async (req, res) => {
 });
 
 orderRouter.delete("/", async (req, res) => {
-    const { orderId, market } = req.body;
+    const parsedOrderId = parseRequiredString(req.body.orderId, "orderId");
+    if (!parsedOrderId.success) {
+        return res.status(400).json({ message: parsedOrderId.message });
+    }
+
+    const parsedMarket = parseMarket(req.body.market);
+    if (!parsedMarket.success) {
+        return res.status(400).json({ message: parsedMarket.message });
+    }
+
     const response = await RedisManager.getInstance().sendAndAwait({
         type: CANCEL_ORDER,
         data: {
-            orderId,
-            market
+            orderId: parsedOrderId.data,
+            market: parsedMarket.data
         }
     });
     res.json(response.payload);
@@ -38,7 +74,12 @@ orderRouter.delete("/", async (req, res) => {
 
 orderRouter.get("/open", async (req, res) => {
     const userId = req.userId as string;
-    const market = req.query.market as string | undefined;
+    const parsedMarket = parseOptionalMarket(req.query.market);
+    if (!parsedMarket.success) {
+        return res.status(400).json({ message: parsedMarket.message });
+    }
+
+    const market = parsedMarket.data;
     const values = market ? [userId, market] : [userId];
 
     const result = await pgPool.query(
@@ -77,7 +118,12 @@ orderRouter.get("/open", async (req, res) => {
 
 orderRouter.get("/history", async (req, res) => {
     const userId = req.userId as string;
-    const market = req.query.market as string | undefined;
+    const parsedMarket = parseOptionalMarket(req.query.market);
+    if (!parsedMarket.success) {
+        return res.status(400).json({ message: parsedMarket.message });
+    }
+
+    const market = parsedMarket.data;
     const values = market ? [userId, market] : [userId];
 
     const result = await pgPool.query(
@@ -116,7 +162,12 @@ orderRouter.get("/history", async (req, res) => {
 
 orderRouter.get("/balance", async (req, res) => {
     const userId = req.userId as string;
-    const asset = String(req.query.asset || "USDT").toUpperCase();
+    const parsedAsset = parseAsset(req.query.asset);
+    if (!parsedAsset.success) {
+        return res.status(400).json({ message: parsedAsset.message });
+    }
+
+    const asset = parsedAsset.data;
 
     const result = await pgPool.query(
         `

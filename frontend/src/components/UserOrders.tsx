@@ -98,7 +98,13 @@ export function UserOrders({ market }: { market: string }) {
     );
 }
 
-function OrdersTable({ orders, onCancel, showAction = false }: { orders: Order[], onCancel?: (id: string) => void, showAction?: boolean }) {
+type OrdersTableProps = {
+    orders: Order[];
+    onCancel?: (id: string) => void | Promise<void>;
+    showAction?: boolean;
+};
+
+function OrdersTable({ orders, onCancel, showAction = false }: OrdersTableProps) {
     if (orders.length === 0) {
         return <div className="p-8 text-center text-xs text-muted-foreground">No orders found</div>;
     }

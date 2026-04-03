@@ -1,13 +1,23 @@
 import "dotenv/config"; 
 import axios from "axios";
 
-const BASE_URL = process.env.API_BASE_URL 
+type OpenOrder = {
+    id: string;
+    side: "buy" | "sell";
+    price: string;
+};
+
+type PlaceOrderResponse = {
+    orderId?: string;
+};
+
+const BASE_URL = process.env.API_BASE_URL;
 const TOTAL_BIDS = 30;
 const TOTAL_ASK = 30;
 const MARKET = "BTC_USDT";
 const BUY_USER_ID = "2";
 const SELL_USER_ID = "5";
-let flag=false;
+let isApiReady = false;
 
 const apiClient = axios.create({
     baseURL: BASE_URL,
@@ -21,7 +31,7 @@ async function waitForApi() {
     try {
       //await axios.get(`${BASE_URL}/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`)
       await apiClient.get(`/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`)
-      flag=true
+      isApiReady = true;
       console.log("API is up!");
       break;
     } catch (e) {
@@ -32,15 +42,15 @@ async function waitForApi() {
 }
 
 async function main() {
-    if(!flag) await waitForApi();
+    if(!isApiReady) await waitForApi();
     const price = 1000 + Math.random() * 10;
     
     // Fetch open orders for BOTH bots independently so it doesn't leak memory or hallucinate empty asks
     const openBidsResponse = await apiClient.get(`/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`);
     const openAsksResponse = await apiClient.get(`/api/v1/order/open?userId=${SELL_USER_ID}&market=${MARKET}`);
     
-    const openBidsData = openBidsResponse.data || [];
-    const openAsksData = openAsksResponse.data || [];
+    const openBidsData = (openBidsResponse.data || []) as OpenOrder[];
+    const openAsksData = (openAsksResponse.data || []) as OpenOrder[];
 
     if (!Array.isArray(openBidsData) || !Array.isArray(openAsksData)) {
         console.error("Failed to fetch valid open orders. Check if API is running at", BASE_URL);
@@ -64,7 +74,7 @@ async function main() {
     while(bidsToAdd > 0 || asksToAdd > 0) {
         if (bidsToAdd > 0) {
             const bidPrice = (price - Math.random() * 1).toFixed(1).toString();
-            const response = await apiClient.post(`/api/v1/order`, {
+            const response = await apiClient.post<PlaceOrderResponse>(`/api/v1/order`, {
                 market: MARKET,
                 price: bidPrice,
                 quantity: "1",
@@ -76,7 +86,7 @@ async function main() {
         }
         if (asksToAdd > 0) {
             const askPrice = (price + Math.random() * 1).toFixed(1).toString();
-            const response = await apiClient.post(`/api/v1/order`, {
+            const response = await apiClient.post<PlaceOrderResponse>(`/api/v1/order`, {
                 market: MARKET,
                 price: askPrice,
                 quantity: "1",
@@ -93,14 +103,14 @@ async function main() {
     main();
 }
 
-async function cancelBidsMoreThan(openOrders: any[], price: number) {
-    let promises: any[] = [];
-    openOrders.map(o => {
+async function cancelBidsMoreThan(openOrders: OpenOrder[], price: number) {
+    const promises: Promise<unknown>[] = [];
+    openOrders.forEach((o) => {
         if (!o?.id) {
             console.log(`[mm] skipping malformed buy order payload ${JSON.stringify(o)}`);
             return;
         }
-        if (o.side === "buy" && (o.price > price || Math.random() < 0.5)) {
+        if (o.side === "buy" && (Number(o.price) > price || Math.random() < 0.5)) {
             console.log(`[mm] cancelling buy orderId=${o.id} price=${o.price}`);
             promises.push(apiClient.delete(`/api/v1/order`, {
                 data: {
@@ -114,14 +124,14 @@ async function cancelBidsMoreThan(openOrders: any[], price: number) {
     return promises.length;
 }
 
-async function cancelAsksLessThan(openOrders: any[], price: number) {
-    let promises: any[] = [];
-    openOrders.map(o => {
+async function cancelAsksLessThan(openOrders: OpenOrder[], price: number) {
+    const promises: Promise<unknown>[] = [];
+    openOrders.forEach((o) => {
         if (!o?.id) {
             console.log(`[mm] skipping malformed sell order payload ${JSON.stringify(o)}`);
             return;
         }
-        if (o.side === "sell" && (o.price < price || Math.random() < 0.5)) {
+        if (o.side === "sell" && (Number(o.price) < price || Math.random() < 0.5)) {
             console.log(`[mm] cancelling sell orderId=${o.id} price=${o.price}`);
             promises.push(apiClient.delete(`/api/v1/order`, {
                 data: {
@@ -137,126 +147,6 @@ async function cancelAsksLessThan(openOrders: any[], price: number) {
 }
 
 main();
-
-// import "dotenv/config";
-// import axios from "axios";
-// import WebSocket from "ws";
-
-// const BASE_URL = process.env.API_BASE_URL
-// const MARKET = "BTC_USDT";
-// const MM_USER_ID = "5";       // Maker (Liquidity Provider)
-// const PAINTER_USER_ID = "2";  // Taker (The Artist) <--- NEW
-
-// // CONFIGURATION
-// const SPREAD = 0.002; // Tight spread (0.2%)
-// const ORDER_SIZE = 10;
-// const PAINTER_INTERVAL = 3000; // Paint a trade every 3 seconds
-
-// let currentPrice = 0;
-// let lastPaintedPrice = 0;
-
-// const apiClient = axios.create({
-//     baseURL: BASE_URL,
-//     headers: {
-//         "x-admin-secret": process.env.ADMIN_SECRET
-//     }
-// })
-
-// function connectToBinance() {
-//     const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-
-//     ws.on('message', (data: any) => {
-//         const trade = JSON.parse(data.toString());
-//         // Scale the price down
-//         currentPrice = parseFloat(trade.p) ;
-//     });
-// }
-
-// // Update your Binance WebSocket listener
-// // function connectToBinance() {
-// //     const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-
-// //     ws.on('message', async (data: any) => {
-// //         const trade = JSON.parse(data.toString());
-// //         const price = parseFloat(trade.p);
-// //         const now = new Date();
-        
-// //         // 1. Reset logic on new minute
-// //         if (now.getMinutes() !== currentMinute) {
-// //             currentMinute = now.getMinutes();
-// //             minuteHigh = -Infinity;
-// //             minuteLow = Infinity;
-// //             // Force a trade immediately to set the "Open" of the new candle
-// //             await executeTrade(price); 
-// //             return;
-// //         }
-
-// //         // 2. Logic: Only trade if it changes the Candle Shape (High/Low)
-// //         //    OR if it's been 2 seconds since last trade (to keep "Close" fresh)
-        
-// //         const isNewHigh = price > minuteHigh;
-// //         const isNewLow = price < minuteLow;
-// //         const isTimeUpdate = (Date.now() - lastTradeTime) > 2000;
-
-// //         if (isNewHigh || isNewLow || isTimeUpdate) {
-// //             // Update our local memory
-// //             if (isNewHigh) minuteHigh = price;
-// //             if (isNewLow) minuteLow = price;
-            
-// //             // Execute the trade to paint the chart
-// //             await executeTrade(price);
-// //         }
-// //     });
-// // }
-
-// // Job 1: Provide Liquidity (The Walls)
-// async function syncLiquidity() {
-//     if (currentPrice === 0) return;
-
-//     const buyPrice = (currentPrice * (1 - SPREAD)).toFixed(2);
-//     const sellPrice = (currentPrice * (1 + SPREAD)).toFixed(2);
-
-//     try {
-//         // --- STEP 1: Fetch Open Orders for this Bot ---
-//         const openOrders = await apiClient.get(`/api/v1/order/open?userId=${MM_USER_ID}&market=${MARKET}`);
-        
-//         // --- STEP 2: Cancel Each Order Individually ---
-//         if (openOrders.data.length > 0) {
-//             const cancelPromises = openOrders.data.map((o: any) => 
-//                 apiClient.delete(`/api/v1/order`, {
-//                     data: { 
-//                         orderId: o.orderId, // We must pass the specific ID
-//                         market: MARKET 
-//                     }
-//                 })
-//             );
-//             await Promise.all(cancelPromises);
-//             console.log(`Cancelled ${openOrders.data.length} stale orders.`);
-//         }
-
-//         // --- STEP 3: Place New Orders ---
-//         await Promise.all([
-//             apiClient.post(`/api/v1/order`, {
-//                 market: MARKET, price: buyPrice, quantity: ORDER_SIZE, side: "buy", userId: MM_USER_ID
-//             }),
-//             apiClient.post(`/api/v1/order`, {
-//                 market: MARKET, price: sellPrice, quantity: ORDER_SIZE, side: "sell", userId: MM_USER_ID
-//             })
-//         ]);
-
-//         console.log(`Liquidity Updated: Bid ${buyPrice} / Ask ${sellPrice}`);
-
-//     } catch (e: any) {
-//         console.error("Liquidity Error:", e.response?.data || e.message);
-//     }
-// }
-
-// // Job 2: Paint the Chart (The Artist)
-// async function paintChart() {
-//     if (currentPrice === 0) return;
-    
-//     // DELETE or COMMENT OUT this line:
-//     // if (Math.abs(currentPrice - lastPaintedPrice) < (currentPrice * 0.001)) return;
 
 //     try {
 //         // Add a small random jitter so Open != Close

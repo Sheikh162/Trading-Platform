@@ -1,5 +1,6 @@
 import "dotenv/config"; 
 import { createLogger } from "@trading-platform/logger";
+import http from "node:http";
 import axios from "axios";
 
 const logger = createLogger("market-maker");
@@ -21,6 +22,7 @@ const MARKET = "BTC_USDT";
 const BUY_USER_ID = "2";
 const SELL_USER_ID = "5";
 let isApiReady = false;
+let shuttingDown = false;
 
 const apiClient = axios.create({
     baseURL: BASE_URL,
@@ -30,7 +32,7 @@ const apiClient = axios.create({
 })
 
 async function waitForApi() {
-  while (true) {
+  while (!shuttingDown) {
     try {
       //await axios.get(`${BASE_URL}/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`)
       await apiClient.get(`/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`)
@@ -45,6 +47,9 @@ async function waitForApi() {
 }
 
 async function main() {
+    if (shuttingDown) {
+        return;
+    }
     if(!isApiReady) await waitForApi();
     const price = 1000 + Math.random() * 10;
     
@@ -56,7 +61,7 @@ async function main() {
     const openAsksData = (openAsksResponse.data || []) as OpenOrder[];
 
     if (!Array.isArray(openBidsData) || !Array.isArray(openAsksData)) {
-        console.error("Failed to fetch valid open orders. Check if API is running at", BASE_URL);
+        logger.error("Failed to fetch valid open orders", { baseUrl: BASE_URL });
         await new Promise(resolve => setTimeout(resolve, 2000));
         return main();
     }
@@ -64,7 +69,12 @@ async function main() {
     const totalBids = openBidsData.length;
     const totalAsks = openAsksData.length;
 
-    console.log(`[mm] cycle start market=${MARKET} targetPrice=${price.toFixed(2)} openBids=${totalBids} openAsks=${totalAsks}`);
+    logger.info("Market maker cycle start", {
+        market: MARKET,
+        targetPrice: price.toFixed(2),
+        openBids: totalBids,
+        openAsks: totalAsks,
+    });
 
     const cancelledBids = await cancelBidsMoreThan(openBidsData, price);
     const cancelledAsks = await cancelAsksLessThan(openAsksData, price);
@@ -72,7 +82,12 @@ async function main() {
     let bidsToAdd = TOTAL_BIDS - (totalBids - cancelledBids);
     let asksToAdd = TOTAL_ASK - (totalAsks - cancelledAsks);
 
-    console.log(`[mm] cycle summary cancelledBids=${cancelledBids} cancelledAsks=${cancelledAsks} bidsToAdd=${bidsToAdd} asksToAdd=${asksToAdd}`);
+    logger.info("Market maker cycle summary", {
+        cancelledBids,
+        cancelledAsks,
+        bidsToAdd,
+        asksToAdd,
+    });
 
     while(bidsToAdd > 0 || asksToAdd > 0) {
         if (bidsToAdd > 0) {
@@ -84,7 +99,11 @@ async function main() {
                 side: "buy",
                 userId: BUY_USER_ID
             });
-            console.log(`[mm] placed buy order user=${BUY_USER_ID} price=${bidPrice} orderId=${response.data?.orderId ?? "unknown"}`);
+            logger.info("Placed buy order", {
+                userId: BUY_USER_ID,
+                price: bidPrice,
+                orderId: response.data?.orderId ?? "unknown",
+            });
             bidsToAdd--;
         }
         if (asksToAdd > 0) {
@@ -96,7 +115,11 @@ async function main() {
                 side: "sell",
                 userId: SELL_USER_ID
             });
-            console.log(`[mm] placed sell order user=${SELL_USER_ID} price=${askPrice} orderId=${response.data?.orderId ?? "unknown"}`);
+            logger.info("Placed sell order", {
+                userId: SELL_USER_ID,
+                price: askPrice,
+                orderId: response.data?.orderId ?? "unknown",
+            });
             asksToAdd--;
         }
     }
@@ -110,11 +133,11 @@ async function cancelBidsMoreThan(openOrders: OpenOrder[], price: number) {
     const promises: Promise<unknown>[] = [];
     openOrders.forEach((o) => {
         if (!o?.id) {
-            console.log(`[mm] skipping malformed buy order payload ${JSON.stringify(o)}`);
+            logger.warn("Skipping malformed buy order payload", o);
             return;
         }
         if (o.side === "buy" && (Number(o.price) > price || Math.random() < 0.5)) {
-            console.log(`[mm] cancelling buy orderId=${o.id} price=${o.price}`);
+            logger.info("Cancelling buy order", { orderId: o.id, price: o.price });
             promises.push(apiClient.delete(`/api/v1/order`, {
                 data: {
                     orderId: o.id,
@@ -131,11 +154,11 @@ async function cancelAsksLessThan(openOrders: OpenOrder[], price: number) {
     const promises: Promise<unknown>[] = [];
     openOrders.forEach((o) => {
         if (!o?.id) {
-            console.log(`[mm] skipping malformed sell order payload ${JSON.stringify(o)}`);
+            logger.warn("Skipping malformed sell order payload", o);
             return;
         }
         if (o.side === "sell" && (Number(o.price) < price || Math.random() < 0.5)) {
-            console.log(`[mm] cancelling sell orderId=${o.id} price=${o.price}`);
+            logger.info("Cancelling sell order", { orderId: o.id, price: o.price });
             promises.push(apiClient.delete(`/api/v1/order`, {
                 data: {
                     orderId: o.id,
@@ -149,7 +172,41 @@ async function cancelAsksLessThan(openOrders: OpenOrder[], price: number) {
     return promises.length;
 }
 
-main();
+const healthPort = Number(process.env.HEALTH_PORT || 8085);
+const healthServer = http.createServer((req, res) => {
+    if (req.url !== "/healthz" && req.url !== "/readyz") {
+        res.writeHead(404);
+        res.end();
+        return;
+    }
+
+    const statusCode = isApiReady && !shuttingDown ? 200 : 503;
+    res.writeHead(statusCode, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+        status: statusCode === 200 ? "ok" : "error",
+        service: "market-maker",
+    }));
+});
+
+healthServer.listen(healthPort, () => {
+    logger.info("Market maker health server listening", { port: healthPort });
+});
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.on(signal, () => {
+        shuttingDown = true;
+        logger.info("Shutting down market maker", { signal });
+        healthServer.closeAllConnections?.();
+        healthServer.close(() => {
+            process.exit(0);
+        });
+    });
+}
+
+main().catch((error) => {
+    logger.error("Market maker failed", error);
+    process.exit(1);
+});
 
 //     try {
 //         // Add a small random jitter so Open != Close

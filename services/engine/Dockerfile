@@ -25,6 +25,7 @@ RUN pnpm --filter @trading-platform/engine... run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+LABEL org.opencontainers.image.title="trading-platform-engine"
 
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
@@ -36,10 +37,11 @@ COPY packages/shared-types/package.json ./packages/shared-types/package.json
 
 RUN pnpm install --filter @trading-platform/engine --prod --frozen-lockfile
 
-COPY --from=builder /app/services/engine/dist ./services/engine/dist
-COPY --from=builder /app/packages/config/dist ./packages/config/dist
-COPY --from=builder /app/packages/logger/dist ./packages/logger/dist
-COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
+COPY --chown=node:node --from=builder /app/services/engine/dist ./services/engine/dist
+COPY --chown=node:node --from=builder /app/packages/config/dist ./packages/config/dist
+COPY --chown=node:node --from=builder /app/packages/logger/dist ./packages/logger/dist
+COPY --chown=node:node --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
 
 WORKDIR /app/services/engine
+USER node
 CMD ["node", "dist/index.js"]

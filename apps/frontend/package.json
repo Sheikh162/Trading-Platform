@@ -7,7 +7,8 @@
     "dev": "next dev -p 3002 --turbopack",
     "build": "next build --webpack",
     "start": "next start -p 3002",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.7",

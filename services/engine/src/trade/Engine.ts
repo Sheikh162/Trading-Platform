@@ -1,6 +1,7 @@
 import fs from "fs";
 import { Client } from "pg";
 import { getPostgresConfig } from "@trading-platform/config";
+import { createLogger } from "@trading-platform/logger";
 import {
   CANCEL_ORDER,
   CREATE_ORDER,
@@ -20,6 +21,7 @@ import { RedisManager } from "../RedisManager";
 import { Orderbook } from "./Orderbook";
 
 export const BASE_CURRENCY = "USDT";
+const logger = createLogger("engine");
 
 interface UserBalance {
     [key: string]: {
@@ -41,31 +43,32 @@ interface PersistedOpenOrderRow {
 export class Engine {
     private orderbooks: Orderbook[] = []; // BTC_USDT etc orderbook is basically like broker, who manages the 2 parties i.e the buyer and seller.
     private balances: Map<string, UserBalance> = new Map(); // userid is key, userbalance interface is the value
+    private snapshotInterval: NodeJS.Timeout;
+    private withSnapshot: boolean;
+    private snapshotFile: string;
 
     constructor() {
         let snapshot = null  // snapshot is a JSON which consists of orderbooks(array of orderbook), and balances(array of balance of each user)
-        const withSnapshot = process.env.WITH_SNAPSHOT === "true";
-        const snapshotFile = process.env.SNAPSHOT_FILE || "./snapshot.json";
+        this.withSnapshot = process.env.WITH_SNAPSHOT === "true";
+        this.snapshotFile = process.env.SNAPSHOT_FILE || "./snapshot.json";
 
         try {
-            if (withSnapshot && fs.existsSync(snapshotFile)) {
-                snapshot = fs.readFileSync(snapshotFile);
-                console.log(`Loaded snapshot from ${snapshotFile}`);
+            if (this.withSnapshot && fs.existsSync(this.snapshotFile)) {
+                snapshot = fs.readFileSync(this.snapshotFile);
+                logger.info("Loaded engine snapshot", { snapshotFile: this.snapshotFile });
             }
         } catch (e) {
-            console.log("No snapshot found");
+            logger.warn("Snapshot load skipped");
         }
 
         if (snapshot) {
             const parsedSnapshot = JSON.parse(snapshot.toString()); //  snapshot type is buffer, thats why we are stringifyng it and parsing it again
             this.orderbooks = parsedSnapshot.orderbooks.map((o: any) => new Orderbook(o.baseAsset, o.bids, o.asks, o.lastTradeId, o.currentPrice));
             this.balances = new Map(parsedSnapshot.balances);
-            console.log(this.orderbooks)
-            console.log(this.balances)
         } else {
             this.orderbooks = [new Orderbook(`BTC`, [], [], 0, 0)];
         }
-        setInterval(() => {
+        this.snapshotInterval = setInterval(() => {
             this.saveSnapshot();
         }, 1000 * 5);
     }
@@ -123,12 +126,16 @@ export class Engine {
 
             this.balances = hydratedBalances;
             this.restoreOpenOrders(openOrdersResult.rows as PersistedOpenOrderRow[]);
-            console.log(`Hydrated ${this.balances.size} users from PostgreSQL`);
-            console.log(`Hydrated ${marketSymbols.length} markets from PostgreSQL`);
+            logger.info("Engine hydrated from PostgreSQL", {
+                users: this.balances.size,
+                markets: marketSymbols.length,
+            });
             if (openOrdersResult.rows.length > 0) {
-                console.log(`[engine] Restored ${openOrdersResult.rows.length} open orders from PostgreSQL into the in-memory orderbook`);
+                logger.info("Restored open orders into memory", {
+                    count: openOrdersResult.rows.length,
+                });
             } else {
-                console.log("[engine] No open orders found in PostgreSQL at startup");
+                logger.info("No open orders found at startup");
             }
         } finally {
             await client.end();
@@ -136,18 +143,29 @@ export class Engine {
     }
 
     saveSnapshot() {
+        if (!this.withSnapshot) {
+            return;
+        }
         const toSnapshot = {
             orderbooks: this.orderbooks.map(o => o.getOrderbookDetailsForSnapshot()),
             balances: Array.from(this.balances.entries())
         }
-        fs.writeFileSync("./snapshot.json", JSON.stringify(toSnapshot));// while writing stringify, while reading parse(.tostring), since buffer while reading
+        fs.writeFileSync(this.snapshotFile, JSON.stringify(toSnapshot));// while writing stringify, while reading parse(.tostring), since buffer while reading
+    }
+
+    close() {
+        clearInterval(this.snapshotInterval);
+        this.saveSnapshot();
     }
 
     process({ message, clientId }: { message: MessageToEngine, clientId: string }) {
         switch (message.type) {
             case USER_CREATED:
                 this.createUser(message.data.userId);
-                console.log(this.balances)
+                logger.info("User created in engine", {
+                    userId: message.data.userId,
+                    totalUsers: this.balances.size,
+                });
                 break;
             case CREATE_ORDER:
                 try {
@@ -161,7 +179,7 @@ export class Engine {
                         }
                     });
                 } catch (e) {
-                    console.log(e);
+                    logger.error("Create order failed", e);
                     RedisManager.getInstance().sendToApi(clientId, {
                         type: "ORDER_CANCELLED",
                         payload: {
@@ -184,10 +202,14 @@ export class Engine {
                     //finding order from asks, bids from the orderbook
                     const order = cancelOrderbook.asks.find(o => o.orderId === orderId) || cancelOrderbook.bids.find(o => o.orderId === orderId);
                     if (!order) {
-                        console.log(`[engine] cancel miss orderId=${orderId} market=${cancelMarket} inMemoryBids=${cancelOrderbook.bids.length} inMemoryAsks=${cancelOrderbook.asks.length}`);
-                        console.log("[engine] top in-memory bid ids:", cancelOrderbook.bids.slice(0, 5).map(o => o.orderId));
-                        console.log("[engine] top in-memory ask ids:", cancelOrderbook.asks.slice(0, 5).map(o => o.orderId));
-                        console.log("No order found");
+                        logger.warn("Cancel missed in-memory order", {
+                            orderId,
+                            market: cancelMarket,
+                            inMemoryBids: cancelOrderbook.bids.length,
+                            inMemoryAsks: cancelOrderbook.asks.length,
+                            topBidIds: cancelOrderbook.bids.slice(0, 5).map(o => o.orderId),
+                            topAskIds: cancelOrderbook.asks.slice(0, 5).map(o => o.orderId),
+                        });
                         throw new Error("No order found");
                     }
 
@@ -230,8 +252,7 @@ export class Engine {
                         }
                     });
                 } catch (e) {
-                    console.log("Error hwile cancelling order",);
-                    console.log(e);
+                    logger.error("Cancel order failed", e);
                 }
                 break;
             case GET_OPEN_ORDERS:
@@ -247,7 +268,7 @@ export class Engine {
                         payload: openOrders
                     });
                 } catch (e) {
-                    console.log(e);
+                    logger.error("Get open orders failed", e);
                 }
                 break;
             case ON_RAMP:
@@ -270,7 +291,7 @@ export class Engine {
                         payload: orderbook.getDepth()
                     });
                 } catch (e) {
-                    console.log(e);
+                    logger.error("Get depth failed", e);
                     RedisManager.getInstance().sendToApi(clientId, {
                         type: "DEPTH",
                         payload: {
@@ -283,7 +304,6 @@ export class Engine {
             case GET_BALANCE: // need to fix this, why does this not return the money? it is in memory
                 try {
                     const userId = message.data.userId;
-                    console.log(userId)
                     const userBalance = this.balances.get(userId);
 
                     // Safely access the available balance of the BASE_CURRENCY (e.g., "INR").
@@ -297,7 +317,7 @@ export class Engine {
                         }
                     });
                 } catch (e) {
-                    console.log(e);
+                    logger.error("Get balance failed", e);
                 }
                 break;
         }
@@ -311,7 +331,10 @@ export class Engine {
         for (const persistedOrder of openOrders) {
             const orderbook = this.orderbooks.find((o) => o.ticker() === persistedOrder.market_symbol);
             if (!orderbook) {
-                console.log(`[engine] skipping restore for orderId=${persistedOrder.id} missing market=${persistedOrder.market_symbol}`);
+                logger.warn("Skipping open-order restore for missing market", {
+                    orderId: persistedOrder.id,
+                    market: persistedOrder.market_symbol,
+                });
                 continue;
             }
 
@@ -327,7 +350,13 @@ export class Engine {
     }
 
     createOrder({ market, price, quantity, side, userId }: Extract<MessageToEngine, { type: typeof CREATE_ORDER }>["data"]) {
-        console.log(`[engine] createOrder request user=${userId} market=${market} side=${side} price=${price} quantity=${quantity}`);
+        logger.info("Create order request", {
+            userId,
+            market,
+            side,
+            price,
+            quantity,
+        });
         const orderbook = this.orderbooks.find(o => o.ticker() === market)
         const baseAsset = market.split("_")[0];
         const quoteAsset = market.split("_")[1];
@@ -362,7 +391,11 @@ export class Engine {
         }
 
         this.publishWsTrades(fills, userId, market);
-        console.log(`[engine] createOrder success orderId=${order.orderId} executedQty=${executedQty} fills=${fills.length}`);
+        logger.info("Create order success", {
+            orderId: order.orderId,
+            executedQty,
+            fillCount: fills.length,
+        });
         return { executedQty, fills, orderId: order.orderId };
     }
 

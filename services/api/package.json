@@ -10,6 +10,7 @@
     "dev": "pnpm run build && pnpm exec concurrently --kill-others --names tsc,node \"pnpm run dev:build\" \"pnpm run dev:start\"",
     "dev:build": "tsc -b -w --preserveWatchOutput",
     "dev:start": "node --watch dist/index.js",
+    "test:health": "pnpm run build && node dist/tests/health-check.js",
     "test:integration": "node ../../scripts/integration-flow.mjs"
   },
   "keywords": [],

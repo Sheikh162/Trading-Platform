@@ -1,12 +1,24 @@
 type LogLevel = "debug" | "info" | "warn" | "error";
 
+function normalizeMeta(meta: unknown) {
+  if (meta instanceof Error) {
+    return {
+      name: meta.name,
+      message: meta.message,
+      stack: meta.stack,
+    };
+  }
+
+  return meta;
+}
+
 function write(level: LogLevel, service: string, message: string, meta?: unknown) {
   const entry = {
     timestamp: new Date().toISOString(),
     level,
     service,
     message,
-    ...(meta !== undefined ? { meta } : {}),
+    ...(meta !== undefined ? { meta: normalizeMeta(meta) } : {}),
   };
 
   const serialized = JSON.stringify(entry);

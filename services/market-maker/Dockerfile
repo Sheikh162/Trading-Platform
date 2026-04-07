@@ -19,6 +19,7 @@ RUN pnpm --filter @trading-platform/market-maker... run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+LABEL org.opencontainers.image.title="trading-platform-market-maker"
 
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
@@ -28,8 +29,9 @@ COPY packages/logger/package.json ./packages/logger/package.json
 
 RUN pnpm install --filter @trading-platform/market-maker --prod --frozen-lockfile
 
-COPY --from=builder /app/services/market-maker/dist ./services/market-maker/dist
-COPY --from=builder /app/packages/logger/dist ./packages/logger/dist
+COPY --chown=node:node --from=builder /app/services/market-maker/dist ./services/market-maker/dist
+COPY --chown=node:node --from=builder /app/packages/logger/dist ./packages/logger/dist
 
 WORKDIR /app/services/market-maker
+USER node
 CMD ["node", "dist/index.js"]

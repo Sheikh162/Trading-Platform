@@ -1,9 +1,13 @@
 import { Client } from 'pg'; 
+import http from "node:http";
 import { getPostgresConfig } from "@trading-platform/config";
 import { createLogger } from "@trading-platform/logger";
 
 const logger = createLogger("persistence-cron");
 const client = new Client(getPostgresConfig());
+let refreshTimer: NodeJS.Timeout | null = null;
+let ready = false;
+let shuttingDown = false;
 
 async function connectToDatabase() {
     try {
@@ -18,44 +22,86 @@ async function connectToDatabase() {
 async function refreshViews() {
     try {
         const startTime = new Date();
-        console.log(`\n[${startTime.toISOString()}] Starting materialized view refresh...`);
+        logger.info("Starting materialized view refresh", { startedAt: startTime.toISOString() });
         
-        console.log('Refreshing klines_1m view...');
         await client.query('REFRESH MATERIALIZED VIEW klines_1m');
-        console.log('klines_1m refreshed');
         
-        console.log('Refreshing klines_1h view...');
         await client.query('REFRESH MATERIALIZED VIEW klines_1h');
-        console.log('klines_1h refreshed');
         
-        console.log('Refreshing klines_1w view...');
         await client.query('REFRESH MATERIALIZED VIEW klines_1w');
-        console.log('klines_1w refreshed');
         
         const endTime = new Date();
         const duration = endTime.getTime() - startTime.getTime();
-        console.log(`All materialized views refreshed successfully in ${duration}ms`);
+        logger.info("Materialized views refreshed", { durationMs: duration });
         
     } catch (error) {
-        console.error('Error refreshing materialized views:', error);
+        logger.error("Error refreshing materialized views", error);
     }
 }
 
 async function main() {
-    console.log('Starting Cron job for materialized view refresh...');
+    logger.info("Starting cron job for materialized view refresh");
     await connectToDatabase();
     
-    // Initial refresh
-    console.log('Performing initial materialized view refresh...');
     await refreshViews();
+    ready = true;
+
+    const healthPort = Number(process.env.HEALTH_PORT || 8084);
+    const healthServer = http.createServer((req, res) => {
+        if (req.url !== "/healthz" && req.url !== "/readyz") {
+            res.writeHead(404);
+            res.end();
+            return;
+        }
+
+        const statusCode = ready && !shuttingDown ? 200 : 503;
+        res.writeHead(statusCode, { "content-type": "application/json" });
+        res.end(JSON.stringify({
+            status: statusCode === 200 ? "ok" : "error",
+            service: "persistence-cron",
+        }));
+    });
+
+    healthServer.listen(healthPort, () => {
+        logger.info("Persistence cron health server listening", { port: healthPort });
+    });
     
-    // Set up interval (every 10 seconds)
-    console.log('Setting up refresh interval (every 10 seconds)...');
-    setInterval(() => {
+    refreshTimer = setInterval(() => {
         refreshViews();
     }, 1000 * 10);
-    
-    console.log('Cron job is now running and will refresh views every 10 seconds');
+
+    const shutdown = async (signal: string) => {
+        shuttingDown = true;
+        ready = false;
+        logger.info("Shutting down persistence cron", { signal });
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+        }
+        await healthServer.closeAllConnections?.();
+        await new Promise<void>((resolve, reject) => {
+            healthServer.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve();
+            });
+        });
+        await client.end();
+        process.exit(0);
+    };
+
+    for (const signal of ["SIGINT", "SIGTERM"] as const) {
+        process.on(signal, () => {
+            shutdown(signal).catch((error) => {
+                logger.error("Persistence cron shutdown failed", error);
+                process.exit(1);
+            });
+        });
+    }
 }
 
-main().catch(console.error);
+main().catch((error) => {
+    logger.error("Persistence cron failed", error);
+    process.exit(1);
+});

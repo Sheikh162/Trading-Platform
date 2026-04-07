@@ -1,8 +1,10 @@
 import { Router } from "express";
+import { createLogger } from "@trading-platform/logger";
 import { pgPool } from "../db";
 import { parseKlineInterval, parseKlineWindow, parseMarket } from "../validation";
 
 export const klineRouter = Router();
+const logger = createLogger("api");
 
 function getBucketExpression(interval: string, column: string) {
   switch (interval) {
@@ -169,7 +171,7 @@ klineRouter.get("/", async (req, res) => {
       })),
     );
   } catch (err) {
-    console.log(err);
+    logger.error("Failed to fetch klines", err);
     return res.status(500).json([]);
   }
 });

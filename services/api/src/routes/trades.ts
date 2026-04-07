@@ -1,8 +1,10 @@
 import { Router } from "express";
+import { createLogger } from "@trading-platform/logger";
 import { pgPool } from "../db";
 import { parseMarket } from "../validation";
 
 export const tradesRouter = Router();
+const logger = createLogger("api");
 
 tradesRouter.get("/", async (req, res) => {
   const parsedMarket = parseMarket(req.query.market || req.query.symbol);
@@ -65,7 +67,7 @@ tradesRouter.get("/", async (req, res) => {
       })),
     );
   } catch (e) {
-    console.error(e);
+    logger.error("Failed to fetch trades", e);
     res.status(500).json([]);
   }
 });

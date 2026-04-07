@@ -96,10 +96,17 @@ async function applyMigrations() {
     const sql = fs.readFileSync(path.join(migrationsDir, file), "utf8");
     logger.info("Applying migration", { file });
     await client.query(sql);
-    await client.query(
-      `INSERT INTO schema_migrations (version) VALUES ($1)`,
+    const recorded = await client.query(
+      `SELECT 1 FROM schema_migrations WHERE version = $1 LIMIT 1`,
       [version],
     );
+
+    if (!recorded.rowCount) {
+      await client.query(
+        `INSERT INTO schema_migrations (version) VALUES ($1)`,
+        [version],
+      );
+    }
   }
 }
 

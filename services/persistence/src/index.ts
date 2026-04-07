@@ -1,4 +1,5 @@
 import { Client } from "pg";
+import http from "node:http";
 import { createClient } from "redis";
 import { getPostgresConfig, getRedisUrl } from "@trading-platform/config";
 import { createLogger } from "@trading-platform/logger";
@@ -7,6 +8,8 @@ import "dotenv/config";
 
 const logger = createLogger("persistence");
 const pgClient = new Client(getPostgresConfig());
+let ready = false;
+let shuttingDown = false;
 
 async function connectToDatabase() {
   try {
@@ -116,9 +119,59 @@ async function main() {
   }
 
   logger.info('Listening to Redis queue "db_processor"');
+  ready = true;
   let messageCount = 0;
 
-  while (true) {
+  const healthPort = Number(process.env.HEALTH_PORT || 8083);
+  const healthServer = http.createServer((req, res) => {
+    if (req.url !== "/healthz" && req.url !== "/readyz") {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
+
+    const statusCode = ready && !shuttingDown ? 200 : 503;
+    res.writeHead(statusCode, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({
+        status: statusCode === 200 ? "ok" : "error",
+        service: "persistence",
+      }),
+    );
+  });
+
+  healthServer.listen(healthPort, () => {
+    logger.info("Persistence health server listening", { port: healthPort });
+  });
+
+  const shutdown = async (signal: string) => {
+    shuttingDown = true;
+    ready = false;
+    logger.info("Shutting down persistence worker", { signal });
+    await healthServer.closeAllConnections?.();
+    await new Promise<void>((resolve, reject) => {
+      healthServer.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+    await Promise.allSettled([redisClient.quit(), pgClient.end()]);
+    process.exit(0);
+  };
+
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.on(signal, () => {
+      shutdown(signal).catch((error) => {
+        logger.error("Persistence shutdown failed", error);
+        process.exit(1);
+      });
+    });
+  }
+
+  while (!shuttingDown) {
     try {
       const response = await redisClient.rPop("db_processor" as string);
       if (!response) {
@@ -126,23 +179,20 @@ async function main() {
         await new Promise((resolve) => setTimeout(resolve, 100));
       } else {
         messageCount++;
-        console.log(`\nMessage #${messageCount} received from Redis queue`);
+        logger.info("Message received from Redis queue", { messageCount });
 
         const parsedResponse: DbMessage = JSON.parse(response);
-        console.log("Message type:", parsedResponse.type);
+        logger.info("Processing message", { type: parsedResponse.type });
 
         if (parsedResponse.type === "TRADE_ADDED") {
           const tradeData = parsedResponse.data;
-          console.log("Processing trade:");
-          console.log("  - isBuyerMaker:", tradeData.isBuyerMaker);
-          console.log("  - Trade ID:", tradeData.id);
-          console.log("  - Market:", tradeData.market);
-          console.log("  - Price:", tradeData.price);
-          console.log("  - Quantity:", tradeData.quantity);
-          console.log(
-            "  - Timestamp:",
-            new Date(tradeData.timestamp).toISOString(),
-          );
+          logger.info("Processing trade", {
+            tradeId: tradeData.id,
+            market: tradeData.market,
+            price: tradeData.price,
+            quantity: tradeData.quantity,
+            timestamp: new Date(tradeData.timestamp).toISOString(),
+          });
 
           const price = parseFloat(tradeData.price);
           const timestamp = new Date(tradeData.timestamp);
@@ -353,7 +403,9 @@ async function main() {
             throw error;
           }
 
-          console.log("Trade data successfully inserted into database");
+          logger.info("Trade data inserted into database", {
+            tradeId: tradeData.id,
+          });
         } else if (parsedResponse.type === "ORDER_UPDATE") {
           const orderData = parsedResponse.data;
 
@@ -546,14 +598,16 @@ async function main() {
             );
           }
         } else {
-          console.log("Skipping message - unsupported type");
+          logger.warn("Skipping unsupported message");
         }
       }
     } catch (error) {
-      console.error("Error processing message:", error);
-      // Continue processing other messages
+      logger.error("Error processing persistence message", error);
     }
   }
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  logger.error("Persistence worker failed", error);
+  process.exit(1);
+});

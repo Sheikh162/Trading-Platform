@@ -26,6 +26,7 @@ RUN pnpm --filter @trading-platform/persistence... run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+LABEL org.opencontainers.image.title="trading-platform-persistence"
 
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
@@ -37,11 +38,12 @@ COPY packages/shared-types/package.json ./packages/shared-types/package.json
 
 RUN pnpm install --filter @trading-platform/persistence --prod --frozen-lockfile
 
-COPY --from=builder /app/services/persistence/dist ./services/persistence/dist
-COPY --from=builder /app/services/persistence/migrations ./services/persistence/migrations
-COPY --from=builder /app/packages/config/dist ./packages/config/dist
-COPY --from=builder /app/packages/logger/dist ./packages/logger/dist
-COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
+COPY --chown=node:node --from=builder /app/services/persistence/dist ./services/persistence/dist
+COPY --chown=node:node --from=builder /app/services/persistence/migrations ./services/persistence/migrations
+COPY --chown=node:node --from=builder /app/packages/config/dist ./packages/config/dist
+COPY --chown=node:node --from=builder /app/packages/logger/dist ./packages/logger/dist
+COPY --chown=node:node --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
 
 WORKDIR /app/services/persistence
+USER node
 CMD ["node", "dist/index.js"]

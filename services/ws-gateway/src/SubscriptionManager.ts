@@ -11,9 +11,16 @@ export class SubscriptionManager {
     private reverseSubscriptions: Map<string, string[]> = new Map();
     private redisClient: RedisClientType;
     private connection: Promise<void>;
+    private ready = false;
 
     private constructor() {
         this.redisClient = createClient({ url: getRedisUrl() });
+        this.redisClient.on("ready", () => {
+            this.ready = true;
+        });
+        this.redisClient.on("end", () => {
+            this.ready = false;
+        });
         this.redisClient.on("error", (error) => {
             logger.error("WebSocket Redis error", error);
         });
@@ -78,6 +85,15 @@ export class SubscriptionManager {
     
     getSubscriptions(userId: string) {
         return this.subscriptions.get(userId) || [];
+    }
+
+    public isReady() {
+        return this.ready;
+    }
+
+    public async close() {
+        await this.connection.catch(() => undefined);
+        await this.redisClient.quit().catch(() => undefined);
     }
 }
 

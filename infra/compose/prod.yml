@@ -3,7 +3,7 @@ services:
     profiles: ["backend"]
     build:
       context: ../..
-      dockerfile: ../../services/api/Dockerfile
+      dockerfile: services/api/Dockerfile
     restart: unless-stopped
     container_name: api
     command: pnpm run start
@@ -23,12 +23,18 @@ services:
     environment:
       - POSTGRES_HOST=timescaledb
       - REDIS_HOST=redis
+      - HEALTH_PORT=8080
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   ws-gateway:
     profiles: ["backend"]
     build:
       context: ../..
-      dockerfile: ../../services/ws-gateway/Dockerfile
+      dockerfile: services/ws-gateway/Dockerfile
     restart: unless-stopped
     container_name: ws-gateway
     depends_on:
@@ -42,12 +48,18 @@ services:
       - ../../services/ws-gateway/.env
     environment:
       - REDIS_HOST=redis
+      - HEALTH_PORT=8081
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   engine:
     profiles: ["backend"]
     build:
       context: ../..
-      dockerfile: ../../services/engine/Dockerfile
+      dockerfile: services/engine/Dockerfile
     restart: unless-stopped
     container_name: engine
     depends_on:
@@ -66,12 +78,18 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_PORT=5432
+      - HEALTH_PORT=8082
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8082/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   db-seed:
     profiles: ["backend"]
     build:
       context: ../..
-      dockerfile: ../../services/persistence/Dockerfile
+      dockerfile: services/persistence/Dockerfile
     container_name: db-seed
     command: pnpm run db:seed
     env_file:
@@ -80,6 +98,7 @@ services:
       - POSTGRES_HOST=timescaledb
       - REDIS_HOST=redis
       - REDIS_URL=redis://redis:6379
+      - HEALTH_PORT=8083
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -90,7 +109,7 @@ services:
     profiles: ["backend"]
     build:
       context: ../..
-      dockerfile: ../../services/persistence/Dockerfile
+      dockerfile: services/persistence/Dockerfile
     restart: unless-stopped
     container_name: db-worker
     command: pnpm run start
@@ -100,6 +119,12 @@ services:
       - POSTGRES_HOST=timescaledb
       - REDIS_HOST=redis
       - REDIS_URL=redis://redis:6379
+      - HEALTH_PORT=8083
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8083/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     depends_on:
       db-seed:
         condition: service_completed_successfully
@@ -112,7 +137,7 @@ services:
     profiles: ["backend"]
     build:
       context: ../..
-      dockerfile: ../../services/persistence/Dockerfile
+      dockerfile: services/persistence/Dockerfile
     restart: unless-stopped
     container_name: db-cron
     command: pnpm run refresh:views
@@ -122,6 +147,12 @@ services:
       - POSTGRES_HOST=timescaledb
       - REDIS_HOST=redis
       - REDIS_URL=redis://redis:6379
+      - HEALTH_PORT=8084
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8084/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     depends_on:
       db-seed:
         condition: service_completed_successfully
@@ -134,7 +165,7 @@ services:
     profiles: ["frontend"]
     build:
       context: ../..
-      dockerfile: ../../apps/frontend/Dockerfile
+      dockerfile: apps/frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: http://localhost:3000/api/v1
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
@@ -156,7 +187,7 @@ services:
     profiles: ["backend"]
     build:
       context: ../..
-      dockerfile: ../../services/market-maker/Dockerfile
+      dockerfile: services/market-maker/Dockerfile
     restart: unless-stopped
     container_name: market-maker
     command: pnpm run start
@@ -167,3 +198,9 @@ services:
       - ../../services/market-maker/.env
     environment:
       - API_BASE_URL=http://api:3000
+      - HEALTH_PORT=8085
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8085/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

@@ -35,8 +35,18 @@ export class UserManager {
         return this.users.get(id);
     }
 
+    public activeUserCount() {
+        return this.users.size;
+    }
+
+    public disconnectAll() {
+        this.users.forEach((_user, id) => {
+            SubscriptionManager.getInstance().userLeft(id);
+        });
+        this.users.clear();
+    }
+
     private getRandomId() {
         return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     }
 }
-

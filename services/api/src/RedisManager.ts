@@ -12,12 +12,27 @@ export class RedisManager {
   private client: RedisClientType;
   private publisher: RedisClientType;
   private static instance: RedisManager;
+  private subscriberReady = false;
+  private publisherReady = false;
 
   private constructor() {
     const redisUrl = getRedisUrl();
 
     this.client = createClient({ url: redisUrl });
     this.publisher = createClient({ url: redisUrl });
+
+    this.client.on("ready", () => {
+      this.subscriberReady = true;
+    });
+    this.client.on("end", () => {
+      this.subscriberReady = false;
+    });
+    this.publisher.on("ready", () => {
+      this.publisherReady = true;
+    });
+    this.publisher.on("end", () => {
+      this.publisherReady = false;
+    });
 
     this.client.connect().catch((error) => {
       logger.error("Failed to connect API subscriber to Redis", error);
@@ -59,5 +74,13 @@ export class RedisManager {
       Math.random().toString(36).substring(2, 15) +
       Math.random().toString(36).substring(2, 15)
     );
+  }
+
+  public isReady() {
+    return this.subscriberReady && this.publisherReady;
+  }
+
+  public async close() {
+    await Promise.allSettled([this.client.quit(), this.publisher.quit()]);
   }
 }

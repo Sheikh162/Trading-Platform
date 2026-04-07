@@ -66,6 +66,15 @@ Docker Compose profiles are used to keep this standard and explicit:
 - `backend` profile: backend microservices
 - `frontend` profile: optional containerized frontend for an all-in-one local demo
 
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Local Development](docs/local-development.md)
+- [Deployment](docs/deployment.md)
+- [Environment Variables](docs/env-vars.md)
+- [Runbook](docs/runbook.md)
+- [Contributing](CONTRIBUTING.md)
+
 ## Current Features
 
 ### Trading Engine

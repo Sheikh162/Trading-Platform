@@ -8,7 +8,6 @@ const BASE_URL = process.env.HTTP_PROXY_URL || process.env.NEXT_PUBLIC_API_URL;
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const endpoint = searchParams.get("endpoint");
-  console.log("Endpoint ", endpoint);
 
   // Build query parameters excluding 'endpoint'
   const params: Record<string, string> = {};

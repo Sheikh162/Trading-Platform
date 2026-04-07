@@ -5,9 +5,11 @@ import bodyParser from "body-parser";
 import { RedisManager } from "../RedisManager";
 import "dotenv/config";
 import { pgPool } from "../db";
+import { createLogger } from "@trading-platform/logger";
 
 export const webhookRouter = express.Router();
 const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
+const logger = createLogger("api");
 
 webhookRouter.post(
   "/clerk",
@@ -54,12 +56,11 @@ webhookRouter.post(
         "svix-signature": svix_signature,
       });
     } catch (err: any) {
-      // --- ADD THESE LOGS ---
-      console.log("❌ Webhook Verification Failed:");
-      console.log("Error Message:", err.message);
-      console.log("Secret Used:", WEBHOOK_SECRET?.slice(0, 5) + "...");
-      console.log("Payload Type:", typeof payload);
-      // ----------------------
+      logger.warn("Webhook verification failed", {
+        message: err.message,
+        secretPrefix: `${WEBHOOK_SECRET?.slice(0, 5)}...`,
+        payloadType: typeof payload,
+      });
       return res.status(400).json({ message: "Verification failed" });
     }
 
@@ -102,9 +103,9 @@ webhookRouter.post(
           },
         });
 
-        console.log(`User ${userId} created and synced to Engine.`);
+        logger.info("Webhook user created and synced to engine", { userId });
       } catch (e) {
-        console.error("Error syncing user:", e);
+        logger.error("Error syncing webhook user", e);
         // Respond with 500 so Clerk retries
         return res.status(500).json({ message: "Internal Server Error" });
       }

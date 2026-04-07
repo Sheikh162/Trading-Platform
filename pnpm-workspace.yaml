@@ -1,7 +1,4 @@
 packages:
-  - api
-  - db
-  - engine
-  - frontend
-  - mm
-  - ws
+  - apps/*
+  - services/*
+  - packages/*

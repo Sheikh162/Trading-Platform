@@ -12,100 +12,7 @@ importers:
         specifier: ^8.2.0
         version: 8.2.2
 
-  api:
-    dependencies:
-      '@clerk/express':
-        specifier: ^1.7.62
-        version: 1.7.67(express@4.22.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@types/body-parser':
-        specifier: ^1.19.6
-        version: 1.19.6
-      body-parser:
-        specifier: ^2.2.2
-        version: 2.2.2
-      cors:
-        specifier: ^2.8.5
-        version: 2.8.6
-      dotenv:
-        specifier: ^17.2.3
-        version: 17.2.3
-      express:
-        specifier: ^4.19.2
-        version: 4.22.1
-      pg:
-        specifier: ^8.12.0
-        version: 8.18.0
-      redis:
-        specifier: ^4.6.14
-        version: 4.7.1
-      svix:
-        specifier: ^1.84.1
-        version: 1.84.1
-    devDependencies:
-      '@types/cors':
-        specifier: ^2.8.17
-        version: 2.8.19
-      '@types/express':
-        specifier: ^4.17.21
-        version: 4.17.25
-      '@types/pg':
-        specifier: ^8.11.6
-        version: 8.16.0
-      typescript:
-        specifier: ^5.4.0
-        version: 5.9.3
-
-  db:
-    dependencies:
-      dotenv:
-        specifier: ^17.2.3
-        version: 17.2.3
-      pg:
-        specifier: ^8.12.0
-        version: 8.18.0
-      redis:
-        specifier: ^4.6.14
-        version: 4.7.1
-    devDependencies:
-      '@types/node':
-        specifier: ^22.5.0
-        version: 22.19.15
-      '@types/pg':
-        specifier: ^8.11.6
-        version: 8.16.0
-      typescript:
-        specifier: ^5.6.3
-        version: 5.9.3
-
-  engine:
-    dependencies:
-      dotenv:
-        specifier: ^17.2.3
-        version: 17.2.3
-      pg:
-        specifier: ^8.12.0
-        version: 8.18.0
-      redis:
-        specifier: ^4.6.14
-        version: 4.7.1
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.27
-      '@types/pg':
-        specifier: ^8.11.6
-        version: 8.16.0
-      '@types/redis':
-        specifier: ^4.0.11
-        version: 4.0.11
-      typescript:
-        specifier: ^5.4.0
-        version: 5.9.3
-      vitest:
-        specifier: ^1.6.0
-        version: 1.6.1(@types/node@20.19.27)(lightningcss@1.32.0)
-
-  frontend:
+  apps/frontend:
     dependencies:
       '@clerk/nextjs':
         specifier: ^6.36.7
@@ -208,8 +115,124 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
-  mm:
+  packages/config:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.5.0
+        version: 22.19.15
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/logger:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.5.0
+        version: 22.19.15
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/shared-types:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  services/api:
     dependencies:
+      '@clerk/express':
+        specifier: ^1.7.62
+        version: 1.7.67(express@4.22.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@trading-platform/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@trading-platform/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@trading-platform/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      '@types/body-parser':
+        specifier: ^1.19.6
+        version: 1.19.6
+      body-parser:
+        specifier: ^2.2.2
+        version: 2.2.2
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.6
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+      express:
+        specifier: ^4.19.2
+        version: 4.22.1
+      pg:
+        specifier: ^8.12.0
+        version: 8.18.0
+      redis:
+        specifier: ^4.6.14
+        version: 4.7.1
+      svix:
+        specifier: ^1.84.1
+        version: 1.84.1
+    devDependencies:
+      '@types/cors':
+        specifier: ^2.8.17
+        version: 2.8.19
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/pg':
+        specifier: ^8.11.6
+        version: 8.16.0
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  services/engine:
+    dependencies:
+      '@trading-platform/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@trading-platform/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@trading-platform/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+      pg:
+        specifier: ^8.12.0
+        version: 8.18.0
+      redis:
+        specifier: ^4.6.14
+        version: 4.7.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.27
+      '@types/pg':
+        specifier: ^8.11.6
+        version: 8.16.0
+      '@types/redis':
+        specifier: ^4.0.11
+        version: 4.0.11
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.27)(lightningcss@1.32.0)
+
+  services/market-maker:
+    dependencies:
+      '@trading-platform/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
@@ -230,20 +253,54 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
-  ws:
+  services/persistence:
     dependencies:
-      bufferutil:
-        specifier: ^4.0.1
-        version: 4.1.0
+      '@trading-platform/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@trading-platform/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@trading-platform/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+      pg:
+        specifier: ^8.12.0
+        version: 8.18.0
+      redis:
+        specifier: ^4.6.14
+        version: 4.7.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.5.0
+        version: 22.19.15
+      '@types/pg':
+        specifier: ^8.11.6
+        version: 8.16.0
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
+  services/ws-gateway:
+    dependencies:
+      '@trading-platform/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@trading-platform/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@trading-platform/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
       redis:
         specifier: ^4.6.14
         version: 4.7.1
-      utf-8-validate:
-        specifier: ^5.0.2
-        version: 5.0.10
       ws:
         specifier: ^8.17.1
         version: 8.19.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -345,6 +402,7 @@ packages:
   '@clerk/clerk-react@5.60.0':
     resolution: {integrity: sha512-P88FncsJpq/3WZJhhlj+md8mYb35BIXpr462C/figwsBGHsinr8VuBQUMcMZZ/6M34C8ABfLTPa6PHVp6+3D5Q==}
     engines: {node: '>=18.17.0'}
+    deprecated: 'This package is no longer supported. Please use @clerk/react instead. See the upgrade guide for more info: https://clerk.com/docs/guides/development/upgrading/upgrade-guides/core-3'
     peerDependencies:
       react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
       react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
@@ -382,6 +440,7 @@ packages:
   '@clerk/types@4.101.14':
     resolution: {integrity: sha512-jl7DywmeaZx1IntgEXcjDZq2uyk+X/1yAZOjxOboeGTS0rNTiQNhv7xK8tFVjexsUAFrYlwC1AxhFuJiMDQjow==}
     engines: {node: '>=18.17.0'}
+    deprecated: 'This package is no longer supported. Please import types from @clerk/shared/types instead. See the upgrade guide for more info: https://clerk.com/docs/guides/development/upgrading/upgrade-guides/core-3'
 
   '@emnapi/core@1.9.1':
     resolution: {integrity: sha512-mukuNALVsoix/w1BJwFzwXBN/dHeejQtuVzcDsfOEsdpCumXb/E9j8w11h5S54tT1xhifGfbbSm/ICrObRb3KA==}
@@ -5358,6 +5417,7 @@ snapshots:
   bufferutil@4.1.0:
     dependencies:
       node-gyp-build: 4.8.4
+    optional: true
 
   bytes@3.1.2: {}
 
@@ -6570,7 +6630,8 @@ snapshots:
       object.entries: 1.1.9
       semver: 6.3.1
 
-  node-gyp-build@4.8.4: {}
+  node-gyp-build@4.8.4:
+    optional: true
 
   node-releases@2.0.36: {}
 
@@ -7384,6 +7445,7 @@ snapshots:
   utf-8-validate@5.0.10:
     dependencies:
       node-gyp-build: 4.8.4
+    optional: true
 
   utils-merge@1.0.1: {}
 

@@ -25,6 +25,8 @@ engine/src/snapshot.json
 
 # Agent & CLI Files
 .agents/
+.codex
+**/.agents/
 skills-lock.json
 
 # Logs

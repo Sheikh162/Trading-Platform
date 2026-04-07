@@ -36,7 +36,7 @@ Core data flow:
 5. The `db-worker` writes orders, trade fills, wallet ledger entries, and balance changes to Postgres.
 6. The frontend reads current state from the API and subscribes to live market streams through `ws`.
 
-![Architecture Diagram](frontend/public/architecture.jpg)
+![Architecture Diagram](apps/frontend/public/architecture.jpg)
 
 ## Tech Stack
 
@@ -47,6 +47,24 @@ Core data flow:
 - Auth: Clerk
 - Infra: Docker, Docker Compose, pnpm workspaces
 - Testing: Vitest
+
+## Runtime Modes
+
+This repo now supports two explicit startup modes:
+
+- `pnpm dev`: local development mode. Only `redis` and `timescaledb` run in Docker. All Node services run on your host with file watching.
+- `pnpm compose:backend:up`: production-style backend mode. Docker Compose runs the backend microservices on one host.
+
+This matches the intended deployment split:
+
+- `frontend`: deploy separately, for example on Vercel
+- backend microservices (`api`, `ws`, `engine`, `db-worker`, `db-cron`, `mm`) plus infrastructure (`redis`, `timescaledb`): run on your VPS with Docker Compose
+
+Docker Compose profiles are used to keep this standard and explicit:
+
+- default services: infrastructure only
+- `backend` profile: backend microservices
+- `frontend` profile: optional containerized frontend for an all-in-one local demo
 
 ## Current Features
 
@@ -100,7 +118,7 @@ Simulated or simplified:
 - The engine keeps the live orderbook in memory
 - Risk checks and exchange-grade security controls are intentionally simplified
 
-## Local Development
+## Setup
 
 ### Prerequisites
 
@@ -115,56 +133,88 @@ Simulated or simplified:
 git clone https://github.com/sheikh162/trading-platform.git
 cd trading-platform
 cp .env.example .env
-cp api/.env.example api/.env
-cp db/.env.example db/.env
-cp engine/.env.example engine/.env
-cp frontend/.env.example frontend/.env
-cp mm/.env.example mm/.env
-cp ws/.env.example ws/.env
+cp services/api/.env.example services/api/.env
+cp services/persistence/.env.example services/persistence/.env
+cp services/engine/.env.example services/engine/.env
+cp apps/frontend/.env.example apps/frontend/.env
+cp services/market-maker/.env.example services/market-maker/.env
+cp services/ws-gateway/.env.example services/ws-gateway/.env
 ```
 
 Fill in your Clerk keys in the relevant `.env` files before running the full app.
 
-### 2. Build Containers
+### 2. Install Dependencies
 
 ```bash
-docker compose build
+pnpm install
 ```
 
-### 3. Start Infrastructure and Apply Schema
+## Local Development
+
+Run Redis and TimescaleDB in Docker, and run the application services directly on your machine:
 
 ```bash
-docker compose up -d timescaledb redis
-docker compose run --rm db-seed
+pnpm dev
 ```
 
-### 4. Start the Full Stack
+What `pnpm dev` does:
 
-```bash
-docker compose up -d
-```
+- starts `redis` and `timescaledb` with Docker Compose
+- waits for both infra services to become reachable
+- applies DB migrations and seeds Timescale objects
+- starts `engine`, `db`, `api`, `ws`, `mm`, and `frontend` on the host in watch mode
 
-### 5. Open the App
+Local URLs:
 
 - Frontend: `http://localhost:3002`
 - API: `http://localhost:3000`
 - WebSocket service: `ws://localhost:3001`
 
-### Stop Everything
+To stop the Dockerized infra only:
 
 ```bash
-docker compose down
+pnpm infra:down
 ```
 
-## Useful Local Commands
-
-If you are running services outside Docker:
+If you need to re-apply the DB seed manually:
 
 ```bash
-pnpm run dev
+pnpm db:seed
 ```
 
-Targeted checks:
+## Production Backend with Docker Compose
+
+For your VPS deployment, keep the frontend separate and start only the backend stack:
+
+```bash
+pnpm compose:backend:up
+```
+
+That command starts:
+
+- `redis`
+- `timescaledb`
+- `engine`
+- `db-seed`
+- `db-worker`
+- `db-cron`
+- `api`
+- `ws`
+- `mm`
+
+To stop the Compose stack:
+
+```bash
+pnpm compose:down
+```
+
+If you ever want a single-host demo with the frontend container included:
+
+```bash
+pnpm compose:full:up
+```
+
+## Useful Commands
 
 ```bash
 pnpm -C db build
@@ -218,6 +268,7 @@ Trade and candle data are time-series shaped. TimescaleDB is a good fit for stor
 - Deposits and withdrawals are simulated
 - No advanced risk engine, rate limiting, or admin tooling yet
 - No production-grade observability stack
+- Frontend deployment configuration for Vercel is still managed separately from the backend Compose stack
 - Some service-level READMEs are still catching up to the latest architecture
 
 ## Resume Value
@@ -244,12 +295,14 @@ Reasonable next steps for this project:
 ## Repository Structure
 
 ```text
-api/        Express API gateway
-db/         DB worker, migrations, seeding, materialized view refresh logic
-engine/     Matching engine and orderbook
-frontend/   Next.js client app
-mm/         Demo market-maker bot
-ws/         WebSocket fanout service
+apps/frontend/            Next.js client app
+services/api/            Express API gateway
+services/engine/         Matching engine and orderbook
+services/persistence/    DB worker, migrations, seeding, materialized view refresh logic
+services/market-maker/   Demo market-maker bot
+services/ws-gateway/     WebSocket fanout service
+packages/                Shared config, logger, and message contracts
+infra/compose/           Base and production Compose manifests
 ```
 
 ## License

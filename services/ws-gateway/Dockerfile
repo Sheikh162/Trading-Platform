@@ -1,0 +1,46 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY services/ws-gateway/package.json ./services/ws-gateway/package.json
+COPY packages/config/package.json ./packages/config/package.json
+COPY packages/logger/package.json ./packages/logger/package.json
+COPY packages/shared-types/package.json ./packages/shared-types/package.json
+
+RUN pnpm install --filter @trading-platform/ws-gateway... --frozen-lockfile
+
+COPY services/ws-gateway/tsconfig.json ./services/ws-gateway/tsconfig.json
+COPY services/ws-gateway/src ./services/ws-gateway/src
+COPY packages/config/tsconfig.json ./packages/config/tsconfig.json
+COPY packages/config/src ./packages/config/src
+COPY packages/logger/tsconfig.json ./packages/logger/tsconfig.json
+COPY packages/logger/src ./packages/logger/src
+COPY packages/shared-types/tsconfig.json ./packages/shared-types/tsconfig.json
+COPY packages/shared-types/src ./packages/shared-types/src
+
+RUN pnpm --filter @trading-platform/ws-gateway... run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY services/ws-gateway/package.json ./services/ws-gateway/package.json
+COPY packages/config/package.json ./packages/config/package.json
+COPY packages/logger/package.json ./packages/logger/package.json
+COPY packages/shared-types/package.json ./packages/shared-types/package.json
+
+RUN pnpm install --filter @trading-platform/ws-gateway --prod --frozen-lockfile
+
+COPY --from=builder /app/services/ws-gateway/dist ./services/ws-gateway/dist
+COPY --from=builder /app/packages/config/dist ./packages/config/dist
+COPY --from=builder /app/packages/logger/dist ./packages/logger/dist
+COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
+
+WORKDIR /app/services/ws-gateway
+EXPOSE 3001
+CMD ["node", "dist/index.js"]

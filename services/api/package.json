@@ -1,0 +1,38 @@
+{
+  "name": "@trading-platform/api",
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.32.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "dev": "pnpm run build && pnpm exec concurrently --kill-others --names tsc,node \"pnpm run dev:build\" \"pnpm run dev:start\"",
+    "dev:build": "tsc -b -w --preserveWatchOutput",
+    "dev:start": "node --watch dist/index.js",
+    "test:integration": "node ../../scripts/integration-flow.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@trading-platform/config": "workspace:*",
+    "@trading-platform/logger": "workspace:*",
+    "@trading-platform/shared-types": "workspace:*",
+    "@clerk/express": "^1.7.62",
+    "@types/body-parser": "^1.19.6",
+    "body-parser": "^2.2.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "redis": "^4.6.14",
+    "svix": "^1.84.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/pg": "^8.11.6",
+    "typescript": "^5.4.0"
+  }
+}

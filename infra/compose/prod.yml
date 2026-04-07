@@ -1,0 +1,169 @@
+services:
+  api:
+    profiles: ["backend"]
+    build:
+      context: ../..
+      dockerfile: ../../services/api/Dockerfile
+    restart: unless-stopped
+    container_name: api
+    command: pnpm run start
+    depends_on:
+      db-seed:
+        condition: service_completed_successfully
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      engine:
+        condition: service_started
+    ports:
+      - "${API_PORT}:3000"
+    env_file:
+      - ../../services/api/.env
+    environment:
+      - POSTGRES_HOST=timescaledb
+      - REDIS_HOST=redis
+
+  ws-gateway:
+    profiles: ["backend"]
+    build:
+      context: ../..
+      dockerfile: ../../services/ws-gateway/Dockerfile
+    restart: unless-stopped
+    container_name: ws-gateway
+    depends_on:
+      redis:
+        condition: service_started
+      engine:
+        condition: service_started
+    ports:
+      - "${WS_PORT}:3001"
+    env_file:
+      - ../../services/ws-gateway/.env
+    environment:
+      - REDIS_HOST=redis
+
+  engine:
+    profiles: ["backend"]
+    build:
+      context: ../..
+      dockerfile: ../../services/engine/Dockerfile
+    restart: unless-stopped
+    container_name: engine
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - ../../services/engine/.env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
+      - WITH_SNAPSHOT=false
+      - POSTGRES_HOST=timescaledb
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PORT=5432
+
+  db-seed:
+    profiles: ["backend"]
+    build:
+      context: ../..
+      dockerfile: ../../services/persistence/Dockerfile
+    container_name: db-seed
+    command: pnpm run db:seed
+    env_file:
+      - ../../services/persistence/.env
+    environment:
+      - POSTGRES_HOST=timescaledb
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db-worker:
+    profiles: ["backend"]
+    build:
+      context: ../..
+      dockerfile: ../../services/persistence/Dockerfile
+    restart: unless-stopped
+    container_name: db-worker
+    command: pnpm run start
+    env_file:
+      - ../../services/persistence/.env
+    environment:
+      - POSTGRES_HOST=timescaledb
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      db-seed:
+        condition: service_completed_successfully
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db-cron:
+    profiles: ["backend"]
+    build:
+      context: ../..
+      dockerfile: ../../services/persistence/Dockerfile
+    restart: unless-stopped
+    container_name: db-cron
+    command: pnpm run refresh:views
+    env_file:
+      - ../../services/persistence/.env
+    environment:
+      - POSTGRES_HOST=timescaledb
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      db-seed:
+        condition: service_completed_successfully
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  frontend:
+    profiles: ["frontend"]
+    build:
+      context: ../..
+      dockerfile: ../../apps/frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3000/api/v1
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    restart: unless-stopped
+    container_name: frontend
+    ports:
+      - "${FRONTEND_PORT}:3002"
+    depends_on:
+      api:
+        condition: service_started
+      ws-gateway:
+        condition: service_started
+    env_file:
+      - ../../apps/frontend/.env
+    environment:
+      - HTTP_PROXY_URL=http://api:3000/api/v1
+
+  market-maker:
+    profiles: ["backend"]
+    build:
+      context: ../..
+      dockerfile: ../../services/market-maker/Dockerfile
+    restart: unless-stopped
+    container_name: market-maker
+    command: pnpm run start
+    depends_on:
+      api:
+        condition: service_started
+    env_file:
+      - ../../services/market-maker/.env
+    environment:
+      - API_BASE_URL=http://api:3000

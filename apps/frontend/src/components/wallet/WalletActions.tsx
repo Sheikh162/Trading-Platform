@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useAuth } from "@clerk/nextjs";
@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/src
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@radix-ui/react-label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@radix-ui/react-tabs";
+import { getBalance } from "@/src/lib/httpClient";
 
 export function WalletActions() {
     const { getToken, userId } = useAuth();
@@ -17,6 +18,23 @@ export function WalletActions() {
     const [depositAmount, setDepositAmount] = useState("");
     const [withdrawAmount, setWithdrawAmount] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [balance, setBalance] = useState<string | null>(null);
+
+    const fetchBalance = async () => {
+        if (!userId) return;
+        try {
+            const token = await getToken();
+            if (!token) return;
+            const bal = await getBalance(userId, token, "USDT");
+            setBalance(bal);
+        } catch (e) {
+            console.error("Failed to fetch balance", e);
+        }
+    };
+
+    useEffect(() => {
+        fetchBalance();
+    }, [userId, getToken]);
 
     const submit = async (endpoint: "wallet/deposits" | "wallet/withdrawals", amount: string) => {
         if (!userId) {
@@ -50,6 +68,7 @@ export function WalletActions() {
                 toast.success("Withdrawal recorded");
             }
 
+            await fetchBalance();
             router.refresh();
         } catch (error: any) {
             toast.error(error.response?.data?.details?.message || error.response?.data?.message || "Request failed");
@@ -61,8 +80,20 @@ export function WalletActions() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Manage Funds</CardTitle>
-                <CardDescription>Deposit or Withdraw funds instantly.</CardDescription>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Manage Funds</CardTitle>
+                        <CardDescription>Deposit or Withdraw funds instantly.</CardDescription>
+                    </div>
+                </div>
+                {userId && (
+                    <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+                        <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">Available USDT</div>
+                        <div className="text-2xl font-mono font-bold tracking-tight">
+                            {balance === null ? "..." : Number(balance).toFixed(2)}
+                        </div>
+                    </div>
+                )}
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="deposit">

@@ -143,6 +143,9 @@ async function cancelBidsMoreThan(openOrders: OpenOrder[], price: number) {
                     orderId: o.id,
                     market: MARKET
                 }
+            }).catch(e => {
+                // Ignore errors from cancellations (likely already filled/removed)
+                logger.debug("Failed to cancel buy order", { id: o.id });
             }));
         }
     });
@@ -164,6 +167,9 @@ async function cancelAsksLessThan(openOrders: OpenOrder[], price: number) {
                     orderId: o.id,
                     market: MARKET
                 }
+            }).catch(e => {
+                // Ignore errors from cancellations (likely already filled/removed)
+                logger.debug("Failed to cancel buy order", { id: o.id });
             }));
         }
     });

@@ -78,7 +78,7 @@ export class Engine {
 
         await client.connect();
         try {
-            const [marketsResult, balancesResult, openOrdersResult] = await Promise.all([
+            const [marketsResult, balancesResult, openOrdersResult, tradeStateResult] = await Promise.all([
                 client.query(`
                     SELECT symbol
                     FROM markets
@@ -96,10 +96,30 @@ export class Engine {
                     WHERE status IN ('open', 'partially_filled')
                     ORDER BY created_at ASC
                 `),
+                client.query(`
+                    SELECT DISTINCT ON (market_symbol)
+                        market_symbol,
+                        COALESCE(
+                            MAX((trade_id)::bigint) OVER (PARTITION BY market_symbol) + 1,
+                            0
+                        )::int AS next_trade_id,
+                        price::text AS latest_price
+                    FROM trade_fills
+                    ORDER BY market_symbol, executed_at DESC
+                `),
             ]);
 
             const marketSymbols = marketsResult.rows.map((row: { symbol: string }) => row.symbol);
             const existing = new Set(this.orderbooks.map((orderbook) => orderbook.ticker()));
+            const tradeStateByMarket = new Map(
+                tradeStateResult.rows.map((row: { market_symbol: string; next_trade_id: number; latest_price: string }) => [
+                    row.market_symbol,
+                    {
+                        nextTradeId: Number(row.next_trade_id),
+                        latestPrice: Number(row.latest_price),
+                    },
+                ]),
+            );
 
             if (this.orderbooks.length === 1 && this.orderbooks[0]?.ticker() === "BTC_USDT" && marketSymbols.includes("BTC_USDT")) {
                 existing.add("BTC_USDT");
@@ -108,8 +128,26 @@ export class Engine {
             for (const symbol of marketSymbols) {
                 if (!existing.has(symbol)) {
                     const [baseAsset] = symbol.split("_");
-                    this.orderbooks.push(new Orderbook(baseAsset, [], [], 0, 0));
+                    const tradeState = tradeStateByMarket.get(symbol);
+                    this.orderbooks.push(
+                        new Orderbook(
+                            baseAsset,
+                            [],
+                            [],
+                            tradeState?.nextTradeId ?? 0,
+                            tradeState?.latestPrice ?? 0,
+                        ),
+                    );
                 }
+            }
+
+            for (const orderbook of this.orderbooks) {
+                const tradeState = tradeStateByMarket.get(orderbook.ticker());
+                if (!tradeState) {
+                    continue;
+                }
+                orderbook.lastTradeId = tradeState.nextTradeId;
+                orderbook.tickerPrice = tradeState.latestPrice;
             }
 
             const hydratedBalances = new Map<string, UserBalance>();
@@ -194,11 +232,13 @@ export class Engine {
                 try {
                     const orderId = message.data.orderId;
                     const cancelMarket = message.data.market;
-                    const cancelOrderbook = this.orderbooks.find(o => o.ticker() === cancelMarket); // finding orderbook in which order to cancel
-                    const quoteAsset = cancelMarket.split("_")[1];
+                    const cancelOrderbook = this.orderbooks.find(o => o.ticker() === cancelMarket);
                     if (!cancelOrderbook) {
                         throw new Error("No orderbook found");
                     }
+                    const baseAsset = cancelMarket.split("_")[0];
+                    const quoteAsset = cancelMarket.split("_")[1];
+
                     //finding order from asks, bids from the orderbook
                     const order = cancelOrderbook.asks.find(o => o.orderId === orderId) || cancelOrderbook.bids.find(o => o.orderId === orderId);
                     if (!order) {
@@ -207,30 +247,33 @@ export class Engine {
                             market: cancelMarket,
                             inMemoryBids: cancelOrderbook.bids.length,
                             inMemoryAsks: cancelOrderbook.asks.length,
-                            topBidIds: cancelOrderbook.bids.slice(0, 5).map(o => o.orderId),
-                            topAskIds: cancelOrderbook.asks.slice(0, 5).map(o => o.orderId),
                         });
                         throw new Error("No order found");
                     }
 
                     if (order.side === "buy") {
-                        const price = cancelOrderbook.cancelBid(order) // when order cancelled, refund has to be done
-                        const leftQuantity = (order.quantity - order.filled) * order.price;
-                        // subtracted since filled i.e executed qty cant be considered while cancelling
-                        //@ts-ignore
-                        this.balances.get(order.userId)[BASE_CURRENCY].available += leftQuantity;//refund ig
-                        //@ts-ignore
-                        this.balances.get(order.userId)[BASE_CURRENCY].locked -= leftQuantity;
+                        const price = cancelOrderbook.cancelBid(order)
+                        const remainingQuoteAmount = (order.quantity - order.filled) * order.price;
+                        
+                        const userBalance = this.balances.get(order.userId);
+                        if (userBalance && userBalance[quoteAsset]) {
+                            userBalance[quoteAsset].available += remainingQuoteAmount;
+                            userBalance[quoteAsset].locked -= remainingQuoteAmount;
+                        }
+                        
                         if (price) {
                             this.sendUpdatedDepthAt(price.toString(), cancelMarket);
                         }
                     } else {
                         const price = cancelOrderbook.cancelAsk(order)
-                        const leftQuantity = order.quantity - order.filled;
-                        //@ts-ignore
-                        this.balances.get(order.userId)[quoteAsset].available += leftQuantity;
-                        //@ts-ignore
-                        this.balances.get(order.userId)[quoteAsset].locked -= leftQuantity;
+                        const remainingBaseAmount = order.quantity - order.filled;
+                        
+                        const userBalance = this.balances.get(order.userId);
+                        if (userBalance && userBalance[baseAsset]) {
+                            userBalance[baseAsset].available += remainingBaseAmount;
+                            userBalance[baseAsset].locked -= remainingBaseAmount;
+                        }
+
                         if (price) {
                             this.sendUpdatedDepthAt(price.toString(), cancelMarket);
                         }
@@ -273,8 +316,9 @@ export class Engine {
                 break;
             case ON_RAMP:
                 const userId = message.data.userId;
+                const asset = message.data.asset;
                 const amount = Number(message.data.amount);
-                this.onRamp(userId, amount);
+                this.onRamp(userId, asset, amount);
                 break;
             case WITHDRAW:
                 this.withdraw(message.data.userId, Number(message.data.amount));
@@ -301,19 +345,18 @@ export class Engine {
                     });
                 }
                 break;
-            case GET_BALANCE: // need to fix this, why does this not return the money? it is in memory
+            case GET_BALANCE: 
                 try {
                     const userId = message.data.userId;
+                    const asset = message.data.asset;
                     const userBalance = this.balances.get(userId);
 
-                    // Safely access the available balance of the BASE_CURRENCY (e.g., "INR").
-                    // It defaults to 0 if the user or their INR balance doesn't exist.
-                    const availableMoney = userBalance?.[BASE_CURRENCY]?.available ?? 0;
+                    const availableBalance = userBalance?.[asset]?.available ?? 0;
 
                     RedisManager.getInstance().sendToApi(clientId, {
                         type: "GET_BALANCE",
                         payload: {
-                            balance: String(availableMoney) // Now sends only the number
+                            balance: String(availableBalance)
                         }
                     });
                 } catch (e) {
@@ -605,31 +648,31 @@ export class Engine {
         }
     }
 
-    onRamp(userId: string, amount: number) {
+    onRamp(userId: string, asset: string, amount: number) {
         const userBalance = this.balances.get(userId);
         if (!userBalance) {
             this.balances.set(userId, {
                 [BASE_CURRENCY]: {
-                    available: amount,
+                    available: asset === BASE_CURRENCY ? amount : 0,
                     locked: 0
                 },
                 "BTC": {
-                    available: 0,
+                    available: asset === "BTC" ? amount : 0,
                     locked: 0
                 },
                 "SOL": {
-                    available: 0,
+                    available: asset === "SOL" ? amount : 0,
                     locked: 0
                 },
             });
         } else {
-            if (!userBalance[BASE_CURRENCY]) {
-                userBalance[BASE_CURRENCY] = {
+            if (!userBalance[asset]) {
+                userBalance[asset] = {
                     available: 0,
                     locked: 0
                 };
             }
-            userBalance[BASE_CURRENCY].available += amount;
+            userBalance[asset].available += amount;
         }
     }
 

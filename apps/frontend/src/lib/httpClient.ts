@@ -92,11 +92,13 @@ export async function getKlines(
 export async function getBalance(
   userId: string,
   token: string,
+  asset: string = "USDT"
 ): Promise<string> {
   const response = await axios.get(PROXY_URL, {
     params: {
       endpoint: "order/balance",
       userId: userId,
+      asset: asset,
     },
     headers: {
       Authorization: `Bearer ${token}`,

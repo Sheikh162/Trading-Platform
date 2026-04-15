@@ -27,6 +27,9 @@ type OrderPanelProps = {
   setOrder: Dispatch<SetStateAction<OrderDraft>>;
   onSubmit: () => Promise<void>;
   balance: string | null;
+  baseBalance: string | null;
+  baseAsset: string;
+  quoteAsset: string;
 };
 
 const initialOrder: OrderDraft = {
@@ -40,64 +43,64 @@ export function SwapUI({ market, initialBalance }: { market: string; initialBala
   const { userId, getToken } = useAuth();
   const [order, setOrder] = useState({ ...initialOrder, market });
   const [balance, setBalance] = useState<string | null>(initialBalance || null);
+  const [baseBalance, setBaseBalance] = useState<string | null>(null);
+
+  const baseAsset = market.split("_")[0];
+  const quoteAsset = market.split("_")[1];
   
-  const fetchBalance = async () => {
+  const fetchBalances = async () => {
     if (!userId) return;
     try {
       const token = (await getToken()) as string;
-      const balanceValue = await getBalance(userId, token);
-      setBalance(balanceValue);
+      const [quoteBal, baseBal] = await Promise.all([
+        getBalance(userId, token, quoteAsset),
+        getBalance(userId, token, baseAsset)
+      ]);
+      setBalance(quoteBal);
+      setBaseBalance(baseBal);
     } catch (err) {
       console.error("Failed to fetch balance ", err);
       setBalance("0");
+      setBaseBalance("0");
     }
   };
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadBalance = async () => {
-      if (!userId || balance !== null) {
-        return;
-      }
+    const loadBalances = async () => {
+      if (!userId) return;
 
       try {
         const token = (await getToken()) as string;
-        const balanceValue = await getBalance(userId, token);
+        const [quoteBal, baseBal] = await Promise.all([
+            getBalance(userId, token, quoteAsset),
+            getBalance(userId, token, baseAsset)
+        ]);
         if (!cancelled) {
-          setBalance(balanceValue);
+          setBalance(quoteBal);
+          setBaseBalance(baseBal);
         }
       } catch (err) {
         console.error("Failed to fetch balance ", err);
         if (!cancelled) {
           setBalance("0");
+          setBaseBalance("0");
         }
       }
     };
 
-    void loadBalance();
+    void loadBalances();
 
     return () => {
       cancelled = true;
     }
-  }, [balance, getToken, userId]);
+  }, [getToken, userId, baseAsset, quoteAsset]);
 
   const handleSubmit = async () => {
     if (!userId) return;
     try {
       const token = await getToken();
-      // const res = await axios.post(
-      //   `${process.env.NEXT_PUBLIC_API_URL}/order`,
-      //   {
-      //     ...order,
-      //     userId: userId,
-      //   },
-      //   {
-      //     headers: {
-      //       Authorization: `Bearer ${token}`,
-      //     },
-      //   },
-      // );
 
       await axios.post(
         `/api/proxy?endpoint=order`, 
@@ -111,7 +114,7 @@ export function SwapUI({ market, initialBalance }: { market: string; initialBala
           },
         },
       );
-      await fetchBalance();
+      await fetchBalances();
     } catch (err) {
       console.error("Order failed ", err);
     }
@@ -136,23 +139,27 @@ export function SwapUI({ market, initialBalance }: { market: string; initialBala
             </TabsTrigger>
           </TabsList>
           <TabsContent value="buy">
-            {/* Pass the string balance down as a prop */}
             <OrderPanel
               type="buy"
               order={order}
               setOrder={setOrder}
               onSubmit={handleSubmit}
               balance={balance}
+              baseBalance={baseBalance}
+              baseAsset={baseAsset}
+              quoteAsset={quoteAsset}
             />
           </TabsContent>
           <TabsContent value="sell">
-            {/* Pass the string balance down as a prop */}
             <OrderPanel
               type="sell"
               order={order}
               setOrder={setOrder}
               onSubmit={handleSubmit}
               balance={balance}
+              baseBalance={baseBalance}
+              baseAsset={baseAsset}
+              quoteAsset={quoteAsset}
             />
           </TabsContent>
         </Tabs>
@@ -161,10 +168,16 @@ export function SwapUI({ market, initialBalance }: { market: string; initialBala
   );
 }
 
-function OrderPanel({ type, order, setOrder, onSubmit, balance }: OrderPanelProps) {
+function OrderPanel({ type, order, setOrder, onSubmit, balance, baseBalance, baseAsset, quoteAsset }: OrderPanelProps) {
   return (
     <CardContent className="p-3 space-y-3">
-      <BalanceDisplay balance={balance} />
+      <BalanceDisplay 
+        balance={balance} 
+        baseBalance={baseBalance} 
+        baseAsset={baseAsset} 
+        quoteAsset={quoteAsset} 
+        side={type}
+      />
       <div className="space-y-1.5">
         <Label htmlFor="price" className="text-xs font-light tracking-[0.05em] uppercase text-muted-foreground">Price</Label>
         <Input
@@ -201,21 +214,39 @@ function OrderPanel({ type, order, setOrder, onSubmit, balance }: OrderPanelProp
   );
 }
 
-// This component now accepts a string and handles parsing
-function BalanceDisplay({ balance }: { balance: string | null }) {
-  // Function to safely parse and format the balance string
-  const formatBalance = (bal: string | null): string => {
+function BalanceDisplay({ 
+    balance, 
+    baseBalance, 
+    baseAsset, 
+    quoteAsset, 
+    side 
+}: { 
+    balance: string | null; 
+    baseBalance: string | null;
+    baseAsset: string;
+    quoteAsset: string;
+    side: "buy" | "sell";
+}) {
+  const formatBalance = (bal: string | null, decimals = 2): string => {
     if (bal === null) return "Loading...";
-
     const num = parseFloat(bal);
-    // Check if the parsed number is valid, otherwise show 0.00
-    return isNaN(num) ? "0.00" : num.toFixed(2);
+    return isNaN(num) ? "0.00" : num.toFixed(decimals);
   };
 
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-muted-foreground">Available Balance (USDT)</span>
-      <span className="font-medium">{formatBalance(balance)}</span>
+    <div className="space-y-1">
+        <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground uppercase tracking-wider">Available {quoteAsset}</span>
+            <span className={`font-medium ${side === "buy" ? "text-foreground" : "text-muted-foreground"}`}>
+                {formatBalance(balance, 2)}
+            </span>
+        </div>
+        <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground uppercase tracking-wider">Available {baseAsset}</span>
+            <span className={`font-medium ${side === "sell" ? "text-foreground" : "text-muted-foreground"}`}>
+                {formatBalance(baseBalance, 4)}
+            </span>
+        </div>
     </div>
   );
 }

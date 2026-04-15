@@ -65,6 +65,7 @@ export type MessageToEngine =
   | {
       type: typeof ON_RAMP;
       data: {
+        asset: string;
         amount: string;
         userId: string;
         txnId: string;
@@ -94,6 +95,7 @@ export type MessageToEngine =
       type: typeof GET_BALANCE;
       data: {
         userId: string;
+        asset: string;
       };
     };
 

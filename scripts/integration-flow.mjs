@@ -63,7 +63,7 @@ function findAsset(assets, symbol) {
 async function main() {
   const buyerDeposit = await request("/api/v1/wallet/deposits", {
     method: "POST",
-    body: { userId: buyerId, asset: "USDT", amount: 1000 },
+    body: { userId: buyerId, asset: "USDT", amount: 20000 },
   });
   assert.equal(buyerDeposit.status, 201, "buyer USDT deposit should succeed");
 
@@ -73,30 +73,30 @@ async function main() {
   });
   assert.equal(sellerDeposit.status, 201, "seller BTC deposit should succeed");
 
-  const restingSell = await request("/api/v1/order", {
-    method: "POST",
-    body: {
-      userId: sellerId,
-      market: "BTC_USDT",
-      price: "100",
-      quantity: "1",
-      side: "sell",
-    },
-  });
-  assert.equal(restingSell.status, 200, "resting sell order should succeed");
-  assert.equal(typeof restingSell.payload.orderId, "string");
-
-  const takingBuy = await request("/api/v1/order", {
+  const aggressiveBuy = await request("/api/v1/order", {
     method: "POST",
     body: {
       userId: buyerId,
       market: "BTC_USDT",
-      price: "100",
+      price: "10000",
       quantity: "1",
       side: "buy",
     },
   });
-  assert.equal(takingBuy.status, 200, "buy order should succeed");
+  assert.equal(aggressiveBuy.status, 200, "aggressive buy order should succeed");
+  assert.equal(typeof aggressiveBuy.payload.orderId, "string");
+
+  const takingSell = await request("/api/v1/order", {
+    method: "POST",
+    body: {
+      userId: sellerId,
+      market: "BTC_USDT",
+      price: "10000",
+      quantity: "1",
+      side: "sell",
+    },
+  });
+  assert.equal(takingSell.status, 200, "sell order should succeed");
 
   await waitFor(async () => {
     const portfolio = await request("/api/v1/portfolio", {
@@ -175,7 +175,7 @@ async function main() {
     assert.equal(balances.status, 200);
     const usdtBalance = balances.payload.balances.find((balance) => balance.asset === "USDT");
     assert.ok(usdtBalance, "buyer should have a USDT balance row");
-    assert.equal(Number(usdtBalance.available), 900);
+    assert.equal(Number(usdtBalance.available), 10000);
     assert.equal(Number(usdtBalance.locked), 0);
     return balances.payload;
   }, "buyer unlocked balance after cancellation");

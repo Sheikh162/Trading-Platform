@@ -24,6 +24,9 @@ services:
       - POSTGRES_HOST=timescaledb
       - REDIS_HOST=redis
       - HEALTH_PORT=8080
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 15s
@@ -74,11 +77,11 @@ services:
       - REDIS_URL=redis://redis:6379
       - WITH_SNAPSHOT=false
       - POSTGRES_HOST=timescaledb
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_PORT=5432
       - HEALTH_PORT=8082
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8082/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 15s
@@ -99,6 +102,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_URL=redis://redis:6379
       - HEALTH_PORT=8083
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -120,6 +126,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_URL=redis://redis:6379
       - HEALTH_PORT=8083
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8083/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 15s
@@ -148,6 +157,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_URL=redis://redis:6379
       - HEALTH_PORT=8084
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8084/readyz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 15s

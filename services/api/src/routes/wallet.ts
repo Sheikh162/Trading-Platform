@@ -285,6 +285,7 @@ walletRouter.post("/deposits", async (req, res) => {
   RedisManager.getInstance().pushMessage({
     type: ON_RAMP,
     data: {
+      asset,
       userId,
       amount: amount.toString(),
       txnId: `deposit_${deposit.id}`,

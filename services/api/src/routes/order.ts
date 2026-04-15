@@ -190,6 +190,7 @@ orderRouter.get("/balance", async (req, res) => {
         type: GET_BALANCE,
         data: {
             userId,
+            asset
         }
     });
     res.json(response.payload);

@@ -80,7 +80,26 @@ export class SubscriptionManager {
     }
 
     public userLeft(userId: string) {
-        this.subscriptions.get(userId)?.forEach(s => this.unsubscribe(userId, s));
+        const userSubscriptions = this.subscriptions.get(userId);
+        if (!userSubscriptions) return;
+
+        userSubscriptions.forEach(subscription => {
+            const reverseSubscriptions = this.reverseSubscriptions.get(subscription);
+            if (reverseSubscriptions) {
+                const updatedReverse = reverseSubscriptions.filter(s => s !== userId);
+                if (updatedReverse.length === 0) {
+                    this.reverseSubscriptions.delete(subscription);
+                    void this.connection
+                        .then(() => this.redisClient.unsubscribe(subscription))
+                        .catch((error) => {
+                            logger.error(`Failed to unsubscribe from Redis channel ${subscription}`, error);
+                        });
+                } else {
+                    this.reverseSubscriptions.set(subscription, updatedReverse);
+                }
+            }
+        });
+        this.subscriptions.delete(userId);
     }
     
     getSubscriptions(userId: string) {

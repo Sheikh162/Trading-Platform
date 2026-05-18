@@ -222,8 +222,8 @@ export class Engine {
                         type: "ORDER_CANCELLED",
                         payload: {
                             orderId: "",
-                            executedQty: 0,
-                            remainingQty: 0
+                            executedQty: "0",
+                            remainingQty: "0"
                         }
                     });
                 }
@@ -253,7 +253,7 @@ export class Engine {
 
                     if (order.side === "buy") {
                         const price = cancelOrderbook.cancelBid(order)
-                        const remainingQuoteAmount = (order.quantity - order.filled) * order.price;
+                        const remainingQuoteAmount = (Number(order.quantity) - Number(order.filled)) * Number(order.price);
                         
                         const userBalance = this.balances.get(order.userId);
                         if (userBalance && userBalance[quoteAsset]) {
@@ -262,11 +262,11 @@ export class Engine {
                         }
                         
                         if (price) {
-                            this.sendUpdatedDepthAt(price.toString(), cancelMarket);
+                            this.sendUpdatedDepthAt(price, cancelMarket);
                         }
                     } else {
                         const price = cancelOrderbook.cancelAsk(order)
-                        const remainingBaseAmount = order.quantity - order.filled;
+                        const remainingBaseAmount = Number(order.quantity) - Number(order.filled);
                         
                         const userBalance = this.balances.get(order.userId);
                         if (userBalance && userBalance[baseAsset]) {
@@ -275,7 +275,7 @@ export class Engine {
                         }
 
                         if (price) {
-                            this.sendUpdatedDepthAt(price.toString(), cancelMarket);
+                            this.sendUpdatedDepthAt(price, cancelMarket);
                         }
                     }
 
@@ -283,8 +283,8 @@ export class Engine {
                         type: "ORDER_CANCELLED",
                         payload: {
                             orderId,
-                            executedQty: 0,
-                            remainingQty: 0
+                            executedQty: "0",
+                            remainingQty: "0"
                         }
                     });
                     RedisManager.getInstance().pushMessage({
@@ -385,9 +385,9 @@ export class Engine {
                 orderId: persistedOrder.id,
                 userId: persistedOrder.user_id,
                 side: persistedOrder.side,
-                price: Number(persistedOrder.price),
-                quantity: Number(persistedOrder.quantity),
-                filled: Number(persistedOrder.filled_quantity),
+                price: persistedOrder.price,
+                quantity: persistedOrder.quantity,
+                filled: persistedOrder.filled_quantity,
             });
         }
     }
@@ -410,36 +410,58 @@ export class Engine {
 
         this.checkAndLockFunds(baseAsset, quoteAsset, side, userId, quoteAsset, price, quantity);
 
-        const order: Order = {
-            price: Number(price),
-            quantity: Number(quantity),
-            orderId: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
-            filled: 0,
-            side,
-            userId
+        try {
+            const order: Order = {
+                price: price,
+                quantity: quantity,
+                orderId: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+                filled: "0",
+                side,
+                userId
+            }
+
+            const { fills, executedQty } = orderbook.addOrder(order);
+            this.updateBalance(userId, baseAsset, quoteAsset, side, fills, executedQty);
+            // Persist the taker order before trade fills so FK-constrained trade_fills inserts succeed.
+            this.updateDbOrders(order, executedQty, fills, market);
+            this.createDbTrades(fills, market, userId, side, order.orderId);
+
+            if (fills.length === 0) {
+                //when no matches, new resting order
+                this.publishRestingOrderUpdate(order, market);
+            }
+
+            this.publishWsTrades(fills, userId, market);
+            logger.info("Create order success", {
+                orderId: order.orderId,
+                executedQty,
+                fillCount: fills.length,
+            });
+            return { executedQty, fills, orderId: order.orderId };
+        } catch (e) {
+            // ROLLBACK: Unlock funds if something went wrong after locking
+            this.unlockFunds(baseAsset, quoteAsset, side, userId, price, quantity);
+            throw e;
         }
+    }
 
-        const { fills, executedQty } = orderbook.addOrder(order);
-        this.updateBalance(userId, baseAsset, quoteAsset, side, fills, executedQty);
-        // Persist the taker order before trade fills so FK-constrained trade_fills inserts succeed.
-        this.updateDbOrders(order, executedQty, fills, market);
-        this.createDbTrades(fills, market, userId, side, order.orderId);
-        //this.publishWsDepthUpdates(fills, price, side, market);  implement later
+    private unlockFunds(baseAsset: string, quoteAsset: string, side: "buy" | "sell", userId: string, price: string, quantity: string) {
+        const userBalance = this.balances.get(userId);
+        if (!userBalance) return;
 
-        if (fills.length > 0) {
-            //if matches occurred, handled by redis in matchBid, matchAsk in orderbook file
+        if (side === "buy") {
+            const amount = Number(quantity) * Number(price);
+            if (userBalance[quoteAsset]) {
+                userBalance[quoteAsset].available += amount;
+                userBalance[quoteAsset].locked -= amount;
+            }
         } else {
-            //when no matches, new resting order
-            this.publishRestingOrderUpdate(order, market);
+            const amount = Number(quantity);
+            if (userBalance[baseAsset]) {
+                userBalance[baseAsset].available += amount;
+                userBalance[baseAsset].locked -= amount;
+            }
         }
-
-        this.publishWsTrades(fills, userId, market);
-        logger.info("Create order success", {
-            orderId: order.orderId,
-            executedQty,
-            fillCount: fills.length,
-        });
-        return { executedQty, fills, orderId: order.orderId };
     }
 
     createDbTrades(fills: Fill[], market: string, userId: string, side: "buy" | "sell", orderId: string) {
@@ -451,10 +473,10 @@ export class Engine {
                     id: fill.tradeId.toString(),
                     isBuyerMaker: fill.otherUserId === userId,
                     price: fill.price,
-                    quantity: fill.qty.toString(),// this pushes volume also
-                    quoteQuantity: (fill.qty * Number(fill.price)).toString(),
+                    quantity: fill.qty,
+                    quoteQuantity: (Number(fill.qty) * Number(fill.price)).toString(),
                     timestamp: Date.now(),
-                    makerOrderId: fill.markerOrderId,
+                    makerOrderId: fill.makerOrderId,
                     takerOrderId: orderId,
                     makerUserId: fill.otherUserId,
                     takerUserId: userId,
@@ -465,20 +487,20 @@ export class Engine {
         });
     }
 
-    updateDbOrders(order: Order, executedQty: number, fills: Fill[], market: string) {
+    updateDbOrders(order: Order, executedQty: string, fills: Fill[], market: string) {
         RedisManager.getInstance().pushMessage({
             type: ORDER_UPDATE,
             data: {
                 orderId: order.orderId,
                 executedQty: executedQty,
                 market: market,
-                price: order.price.toString(),
-                quantity: order.quantity.toString(),
+                price: order.price,
+                quantity: order.quantity,
                 side: order.side,
                 userId: order.userId,
-                status: executedQty === 0
+                status: executedQty === "0"
                     ? "open"
-                    : executedQty >= order.quantity
+                    : Number(executedQty) >= Number(order.quantity)
                         ? "filled"
                         : "partially_filled",
             }
@@ -488,12 +510,13 @@ export class Engine {
             RedisManager.getInstance().pushMessage({
                 type: ORDER_UPDATE,
                 data: {
-                    orderId: fill.markerOrderId,
+                    orderId: fill.makerOrderId,
                     executedQty: fill.qty
                 }
             });
         });
     }
+
     publishWsTrades(fills: Fill[], userId: string, market: string) {
         fills.forEach(fill => {
             RedisManager.getInstance().publishMessage(`trade@${market}`, {
@@ -503,7 +526,7 @@ export class Engine {
                     t: fill.tradeId,
                     m: fill.otherUserId === userId,
                     p: fill.price,
-                    q: fill.qty.toString(),
+                    q: fill.qty,
                     s: market,
                 }
             });
@@ -535,7 +558,7 @@ export class Engine {
         if (!orderbook) return;
 
         const depth = orderbook.getDepth();
-        const priceStr = order.price.toString();
+        const priceStr = order.price;
 
         if (order.side === "buy") {
             const updatedBid = depth.bids.find(x => x[0] === priceStr) as [string, string]
@@ -550,7 +573,7 @@ export class Engine {
             });
         } else {
             const updatedAsk = depth.asks.find(x => x[0] === priceStr) ||
-                [priceStr, order.quantity.toString()];
+                [priceStr, order.quantity];
 
             RedisManager.getInstance().publishMessage(`depth@${market}`, {
                 stream: `depth@${market}`,
@@ -583,68 +606,74 @@ export class Engine {
             }
         });
     }
-    // similar to the above, make for currentprice i.e ticker price
 
-    updateBalance(userId: string, baseAsset: string, quoteAsset: string, side: "buy" | "sell", fills: Fill[], executedQty: number) {
+    updateBalance(userId: string, baseAsset: string, quoteAsset: string, side: "buy" | "sell", fills: Fill[], executedQty: string) {
         if (side === "buy") {
             fills.forEach(fill => {
-                // Update quote asset balance
-                //@ts-ignore
-                this.balances.get(fill.otherUserId)[quoteAsset].available = this.balances.get(fill.otherUserId)?.[quoteAsset].available + (fill.qty * fill.price);
+                const takerUserId = userId;
+                const makerUserId = fill.otherUserId;
+                const takerBalance = this.balances.get(takerUserId);
+                const makerBalance = this.balances.get(makerUserId);
 
-                //@ts-ignore
-                this.balances.get(userId)[quoteAsset].locked = this.balances.get(userId)?.[quoteAsset].locked - (fill.qty * fill.price);
+                if (takerBalance && makerBalance) {
+                    const quoteAmount = Number(fill.qty) * Number(fill.price);
+                    const baseAmount = Number(fill.qty);
 
-                // Update base asset balance
+                    // Update maker
+                    if (makerBalance[quoteAsset]) makerBalance[quoteAsset].available += quoteAmount;
+                    if (makerBalance[baseAsset]) makerBalance[baseAsset].locked -= baseAmount;
 
-                //@ts-ignore
-                this.balances.get(fill.otherUserId)[baseAsset].locked = this.balances.get(fill.otherUserId)?.[baseAsset].locked - fill.qty;
-
-                //@ts-ignore
-                this.balances.get(userId)[baseAsset].available = this.balances.get(userId)?.[baseAsset].available + fill.qty;
-
+                    // Update taker
+                    if (takerBalance[quoteAsset]) takerBalance[quoteAsset].locked -= quoteAmount;
+                    if (takerBalance[baseAsset]) takerBalance[baseAsset].available += baseAmount;
+                }
             });
 
         } else {
             fills.forEach(fill => {
-                // Update quote asset balance
-                //@ts-ignore
-                this.balances.get(fill.otherUserId)[quoteAsset].locked = this.balances.get(fill.otherUserId)?.[quoteAsset].locked - (fill.qty * fill.price);
+                const takerUserId = userId;
+                const makerUserId = fill.otherUserId;
+                const takerBalance = this.balances.get(takerUserId);
+                const makerBalance = this.balances.get(makerUserId);
 
-                //@ts-ignore
-                this.balances.get(userId)[quoteAsset].available = this.balances.get(userId)?.[quoteAsset].available + (fill.qty * fill.price);
+                if (takerBalance && makerBalance) {
+                    const quoteAmount = Number(fill.qty) * Number(fill.price);
+                    const baseAmount = Number(fill.qty);
 
-                // Update base asset balance
+                    // Update maker
+                    if (makerBalance[quoteAsset]) makerBalance[quoteAsset].locked -= quoteAmount;
+                    if (makerBalance[baseAsset]) makerBalance[baseAsset].available += baseAmount;
 
-                //@ts-ignore
-                this.balances.get(fill.otherUserId)[baseAsset].available = this.balances.get(fill.otherUserId)?.[baseAsset].available + fill.qty;
-
-                //@ts-ignore
-                this.balances.get(userId)[baseAsset].locked = this.balances.get(userId)?.[baseAsset].locked - (fill.qty);
-
+                    // Update taker
+                    if (takerBalance[quoteAsset]) takerBalance[takerBalance[quoteAsset] ? quoteAsset : BASE_CURRENCY].available += quoteAmount;
+                    if (takerBalance[baseAsset]) takerBalance[baseAsset].locked -= baseAmount;
+                }
             });
         }
     }
 
     checkAndLockFunds(baseAsset: string, quoteAsset: string, side: "buy" | "sell", userId: string, asset: string, price: string, quantity: string) {
+        const userBalance = this.balances.get(userId);
+        if (!userBalance) {
+            throw new Error("User balance not found");
+        }
+
         if (side === "buy") {
-            if ((this.balances.get(userId)?.[quoteAsset]?.available || 0) < Number(quantity) * Number(price)) { // price here is per unit stock
+            const amountRequired = Number(quantity) * Number(price);
+            const balance = userBalance[quoteAsset];
+            if (!balance || balance.available < amountRequired) {
                 throw new Error("Insufficient funds");
             }
-            //@ts-ignore
-            this.balances.get(userId)[quoteAsset].available = this.balances.get(userId)?.[quoteAsset].available - (Number(quantity) * Number(price));
-
-            //@ts-ignore
-            this.balances.get(userId)[quoteAsset].locked = this.balances.get(userId)?.[quoteAsset].locked + (Number(quantity) * Number(price));
+            balance.available -= amountRequired;
+            balance.locked += amountRequired;
         } else {
-            if ((this.balances.get(userId)?.[baseAsset]?.available || 0) < Number(quantity)) {
+            const amountRequired = Number(quantity);
+            const balance = userBalance[baseAsset];
+            if (!balance || balance.available < amountRequired) {
                 throw new Error("Insufficient funds");
             }
-            //@ts-ignore
-            this.balances.get(userId)[baseAsset].available = this.balances.get(userId)?.[baseAsset].available - (Number(quantity));
-
-            //@ts-ignore
-            this.balances.get(userId)[baseAsset].locked = this.balances.get(userId)?.[baseAsset].locked + Number(quantity);
+            balance.available -= amountRequired;
+            balance.locked += amountRequired;
         }
     }
 

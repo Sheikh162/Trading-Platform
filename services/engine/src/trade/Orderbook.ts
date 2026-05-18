@@ -15,7 +15,7 @@ export class Orderbook {
         this.asks = asks;
         this.baseAsset = baseAsset;
         this.lastTradeId = lastTradeId || 0;
-        this.tickerPrice = currentPrice ||0;
+        this.tickerPrice = currentPrice || 0;
     }
 
     ticker() {
@@ -41,9 +41,9 @@ export class Orderbook {
         this.insertAsk(order);
     }
 
-    addOrder(order: Order): {executedQty: number,fills: Fill[]} {
+    addOrder(order: Order): { executedQty: string, fills: Fill[] } {
         if (order.side === "buy") {
-            const {executedQty, fills} = this.matchBid(order); 
+            const { executedQty, fills } = this.matchBid(order);
             order.filled = executedQty;
             if (executedQty === order.quantity) {
                 return {
@@ -58,7 +58,7 @@ export class Orderbook {
                 fills
             }
         } else {
-            const {executedQty, fills} = this.matchAsk(order);
+            const { executedQty, fills } = this.matchAsk(order);
             order.filled = executedQty;
             if (executedQty === order.quantity) {
                 return {
@@ -74,176 +74,180 @@ export class Orderbook {
         }
     }
 
-    matchBid(order: Order): {fills: Fill[], executedQty: number} {
+    matchBid(order: Order): { fills: Fill[], executedQty: string } {
         const fills: Fill[] = [];
         let executedQty = 0;
         const priceLevelChanges = new Map<string, number>();
-    
+
         for (let i = 0; i < this.asks.length; i++) {
             const ask = this.asks[i];
-            if (ask.userId !== order.userId && ask.price <= order.price) {
-                const fillableQty = Math.min(order.quantity - executedQty, ask.quantity - ask.filled);
+            const askPriceNum = Number(ask.price);
+            const orderPriceNum = Number(order.price);
+            if (ask.userId !== order.userId && askPriceNum <= orderPriceNum) {
+                const fillableQty = Math.min(Number(order.quantity) - executedQty, Number(ask.quantity) - Number(ask.filled));
                 if (fillableQty <= 0) continue;
-    
+
                 executedQty += fillableQty;
-                ask.filled += fillableQty;
-    
-                const current = priceLevelChanges.get(ask.price.toString()) || 0;
-                priceLevelChanges.set(ask.price.toString(), current - fillableQty);
-    
+                ask.filled = (Number(ask.filled) + fillableQty).toString();
+
+                const current = priceLevelChanges.get(ask.price) || 0;
+                priceLevelChanges.set(ask.price, current - fillableQty);
+
                 fills.push({
-                    price: ask.price.toString(),
-                    qty: fillableQty,
+                    price: ask.price,
+                    qty: fillableQty.toString(),
                     tradeId: this.lastTradeId++,
                     otherUserId: ask.userId,
-                    markerOrderId: ask.orderId
+                    makerOrderId: ask.orderId
                 });
 
                 this.tickerPrice = parseFloat(fills[fills.length - 1].price);
                 this.publishTickerPrice()
-                if (executedQty >= order.quantity) break;
+                if (executedQty >= Number(order.quantity)) break;
             }
         }
-    
+
         const affectedAsks: [string, string][] = [];
         priceLevelChanges.forEach((netChange, price) => {
             const currentDepthQty = this.asks
-                .filter(a => a.price.toString() === price && a.filled < a.quantity)
-                .reduce((sum, a) => sum + (a.quantity - a.filled), 0);
-            
+                .filter(a => a.price === price && Number(a.filled) < Number(a.quantity))
+                .reduce((sum, a) => sum + (Number(a.quantity) - Number(a.filled)), 0);
+
             affectedAsks.push([price, currentDepthQty.toString()]);
         });
-    
+
         if (affectedAsks.length > 0) {
             RedisManager.getInstance().publishMessage(`depth@${this.ticker()}`, {
                 stream: `depth@${this.ticker()}`,
                 data: {
                     a: affectedAsks,
-                    b: order.quantity > executedQty 
-                        ? [[order.price.toString(), (order.quantity - executedQty).toString()]]
+                    b: Number(order.quantity) > executedQty
+                        ? [[order.price, (Number(order.quantity) - executedQty).toString()]]
                         : [],
                     e: "depth"
                 }
             });
         }
-    
-        this.asks = this.asks.filter(ask => ask.filled < ask.quantity);
-        return { fills, executedQty };
+
+        this.asks = this.asks.filter(ask => Number(ask.filled) < Number(ask.quantity));
+        return { fills, executedQty: executedQty.toString() };
     }
 
-    matchAsk(order: Order): {fills: Fill[], executedQty: number} {
+    matchAsk(order: Order): { fills: Fill[], executedQty: string } {
         const fills: Fill[] = [];
         let executedQty = 0;
         const priceLevelChanges = new Map<string, number>();
-    
+
         for (let i = 0; i < this.bids.length; i++) {
             const bid = this.bids[i];
-            if (bid.userId !== order.userId && bid.price >= order.price) {
-                const fillableQty = Math.min(order.quantity - executedQty, bid.quantity - bid.filled);
+            const bidPriceNum = Number(bid.price);
+            const orderPriceNum = Number(order.price);
+            if (bid.userId !== order.userId && bidPriceNum >= orderPriceNum) {
+                const fillableQty = Math.min(Number(order.quantity) - executedQty, Number(bid.quantity) - Number(bid.filled));
                 if (fillableQty <= 0) continue;
-    
+
                 executedQty += fillableQty;
-                bid.filled += fillableQty;
-    
-                const current = priceLevelChanges.get(bid.price.toString()) || 0;
-                priceLevelChanges.set(bid.price.toString(), current - fillableQty);
-    
+                bid.filled = (Number(bid.filled) + fillableQty).toString();
+
+                const current = priceLevelChanges.get(bid.price) || 0;
+                priceLevelChanges.set(bid.price, current - fillableQty);
+
                 fills.push({
-                    price: bid.price.toString(),
-                    qty: fillableQty,
+                    price: bid.price,
+                    qty: fillableQty.toString(),
                     tradeId: this.lastTradeId++,
                     otherUserId: bid.userId,
-                    markerOrderId: bid.orderId
+                    makerOrderId: bid.orderId
                 });
 
                 this.tickerPrice = parseFloat(fills[fills.length - 1].price);
                 this.publishTickerPrice()
 
-                if (executedQty >= order.quantity) break;
+                if (executedQty >= Number(order.quantity)) break;
             }
         }
-    
+
         const affectedBids: [string, string][] = [];
         priceLevelChanges.forEach((netChange, price) => {
             const currentDepthQty = this.bids
-                .filter(b => b.price.toString() === price && b.filled < b.quantity)
-                .reduce((sum, b) => sum + (b.quantity - b.filled), 0);
-            
+                .filter(b => b.price === price && Number(b.filled) < Number(b.quantity))
+                .reduce((sum, b) => sum + (Number(b.quantity) - Number(b.filled)), 0);
+
             affectedBids.push([price, currentDepthQty.toString()]);
         });
-    
+
         if (affectedBids.length > 0) {
             RedisManager.getInstance().publishMessage(`depth@${this.ticker()}`, {
                 stream: `depth@${this.ticker()}`,
                 data: {
-                    a: order.quantity > executedQty 
-                        ? [[order.price.toString(), (order.quantity - executedQty).toString()]]
+                    a: Number(order.quantity) > executedQty
+                        ? [[order.price, (Number(order.quantity) - executedQty).toString()]]
                         : [],
                     b: affectedBids,
                     e: "depth"
                 }
             });
         }
-    
-        this.bids = this.bids.filter(bid => bid.filled < bid.quantity);
-        return { fills, executedQty };
+
+        this.bids = this.bids.filter(bid => Number(bid.filled) < Number(bid.quantity));
+        return { fills, executedQty: executedQty.toString() };
     }
 
-    publishTickerPrice() {    
-        const tickerPrice=this.tickerPrice
-        const market=this.ticker()
+    publishTickerPrice() {
+        const tickerPrice = this.tickerPrice
+        const market = this.ticker()
         RedisManager.getInstance().publishMessage(`ticker@${market}`, {
             stream: `ticker@${market}`,
             data: {
-                c: tickerPrice.toString(), 
+                c: tickerPrice.toString(),
                 // h:"",
                 // l:"",
                 // v:"",
                 // V:"",
                 //id: 123,
-                s:market,
+                s: market,
                 e: "ticker"
             }
         });
     }
 
     getDepth() {
-            const bids: [string, string][] = [];
-            const asks: [string, string][] = [];
-        
-            //using map specifically maintain insertion order
-            const bidsMap = new Map<number, number>();
-            const asksMap = new Map<number, number>();
-        
-            for (let i = 0; i < this.bids.length; i++) {
-                const order = this.bids[i];
-                const currentQty = bidsMap.get(order.price) || 0;
-                if (order.quantity > order.filled) {
-                    bidsMap.set(order.price, currentQty + (order.quantity - order.filled));
-                }
-            }
-        
-            for (let i = 0; i < this.asks.length; i++) {
-                const order = this.asks[i];
-                const currentQty = asksMap.get(order.price) || 0;
-                if (order.quantity > order.filled) {
-                    asksMap.set(order.price, currentQty + (order.quantity - order.filled));
-                }
-            }
-        
-            //convert map to array
-            bidsMap.forEach((value, price) => {
-                bids.push([price.toString(), value.toString()]);
-            });
-        
-            asksMap.forEach((value, price) => {
-                asks.push([price.toString(), value.toString()]);
-            });
+        const bids: [string, string][] = [];
+        const asks: [string, string][] = [];
 
-            return {
-                bids,
-                asks
-            };
+        //using map specifically maintain insertion order
+        const bidsMap = new Map<string, number>();
+        const asksMap = new Map<string, number>();
+
+        for (let i = 0; i < this.bids.length; i++) {
+            const order = this.bids[i];
+            const currentQty = bidsMap.get(order.price) || 0;
+            if (Number(order.quantity) > Number(order.filled)) {
+                bidsMap.set(order.price, currentQty + (Number(order.quantity) - Number(order.filled)));
+            }
+        }
+
+        for (let i = 0; i < this.asks.length; i++) {
+            const order = this.asks[i];
+            const currentQty = asksMap.get(order.price) || 0;
+            if (Number(order.quantity) > Number(order.filled)) {
+                asksMap.set(order.price, currentQty + (Number(order.quantity) - Number(order.filled)));
+            }
+        }
+
+        //convert map to array
+        bidsMap.forEach((value, price) => {
+            bids.push([price, value.toString()]);
+        });
+
+        asksMap.forEach((value, price) => {
+            asks.push([price, value.toString()]);
+        });
+
+        return {
+            bids,
+            asks
+        };
     }
 
     getOpenOrders(userId: string): Order[] {
@@ -271,13 +275,14 @@ export class Orderbook {
     }
 
     private insertBid(order: Order) {
-        if (this.bids.length === 0 || order.price <= this.bids[this.bids.length - 1].price) {
+        const orderPriceNum = Number(order.price);
+        if (this.bids.length === 0 || orderPriceNum <= Number(this.bids[this.bids.length - 1].price)) {
             this.bids.push(order);
             return;
         }
 
         for (let i = 0; i < this.bids.length; i++) {
-            if (order.price > this.bids[i].price) {
+            if (orderPriceNum > Number(this.bids[i].price)) {
                 this.bids.splice(i, 0, order);
                 return;
             }
@@ -285,13 +290,14 @@ export class Orderbook {
     }
 
     private insertAsk(order: Order) {
-        if (this.asks.length === 0 || order.price >= this.asks[this.asks.length - 1].price) {
+        const orderPriceNum = Number(order.price);
+        if (this.asks.length === 0 || orderPriceNum >= Number(this.asks[this.asks.length - 1].price)) {
             this.asks.push(order);
             return;
         }
 
         for (let i = 0; i < this.asks.length; i++) {
-            if (order.price < this.asks[i].price) {
+            if (orderPriceNum < Number(this.asks[i].price)) {
                 this.asks.splice(i, 0, order);
                 return;
             }

@@ -70,7 +70,7 @@ async function main() {
     while (!shuttingDown) {
         const response = await redisClient.rPop("messages" as string) // lpush done from sendandawait in api fn
         if (!response) {
-
+            await new Promise((resolve) => setTimeout(resolve, 100));
         }  else {
             engine.process(JSON.parse(response));  // response structure {clientId,message}
         }        

@@ -22,20 +22,20 @@ export type OrderStatus =
   | "rejected";
 
 export interface OpenOrder {
-  price: number;
-  quantity: number;
+  price: string;
+  quantity: string;
   orderId: string;
-  filled: number;
+  filled: string;
   side: OrderSide;
   userId: string;
 }
 
 export interface Fill {
   price: string;
-  qty: number;
+  qty: string;
   tradeId: number;
   otherUserId: string;
-  markerOrderId: string;
+  makerOrderId: string;
 }
 
 export type MessageToEngine =
@@ -118,10 +118,10 @@ export type MessageFromEngine =
       type: "ORDER_PLACED";
       payload: {
         orderId: string;
-        executedQty: number;
+        executedQty: string;
         fills: Array<{
           price: string;
-          qty: number;
+          qty: string;
           tradeId: number;
         }>;
       };
@@ -130,8 +130,8 @@ export type MessageFromEngine =
       type: "ORDER_CANCELLED";
       payload: {
         orderId: string;
-        executedQty: number;
-        remainingQty: number;
+        executedQty: string;
+        remainingQty: string;
       };
     }
   | {
@@ -168,7 +168,7 @@ export type DbMessage =
       type: typeof ORDER_UPDATE;
       data: {
         orderId: string;
-        executedQty?: number;
+        executedQty?: string;
         market?: string;
         price?: string;
         quantity?: string;

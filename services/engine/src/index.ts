@@ -1,3 +1,4 @@
+import "dotenv/config"
 import { getRedisUrl } from "@trading-platform/config";
 import { createLogger } from "@trading-platform/logger";
 import http from "node:http";

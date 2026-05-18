@@ -16,8 +16,8 @@ type PlaceOrderResponse = {
 };
 
 const BASE_URL = process.env.API_BASE_URL;
-const TOTAL_BIDS = 30;
-const TOTAL_ASK = 30;
+const TOTAL_BIDS = 20;
+const TOTAL_ASK = 20;
 const MARKET = "BTC_USDT";
 const BUY_USER_ID = "2";
 const SELL_USER_ID = "5";

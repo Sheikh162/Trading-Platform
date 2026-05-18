@@ -425,7 +425,7 @@ async function main() {
               orderData.status ??
               (initialFilled === 0
                 ? "open"
-                : Number(orderData.quantity) <= initialFilled
+                : Number(orderData.quantity) <= Number(initialFilled)
                   ? "filled"
                   : "partially_filled");
 

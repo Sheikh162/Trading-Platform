@@ -42,17 +42,24 @@ orderRouter.post("/", async (req, res) => {
     }
 
     const userId: string = req.userId as string
-    const response = await RedisManager.getInstance().sendAndAwait({
-        type: CREATE_ORDER,
-        data: {
-            market: parsedMarket.data,
-            price: parsedPrice.data,
-            quantity: parsedQuantity.data,
-            side: parsedSide.data,
-            userId
+    try {
+        const response = await RedisManager.getInstance().sendAndAwait({
+            type: CREATE_ORDER,
+            data: {
+                market: parsedMarket.data,
+                price: parsedPrice.data,
+                quantity: parsedQuantity.data,
+                side: parsedSide.data,
+                userId
+            }
+        });
+        res.json(response.payload);
+    } catch (error) {
+        if (error instanceof Error && error.message === "Request timed out") {
+            return res.status(504).json({ message: "Engine response timed out" });
         }
-    });
-    res.json(response.payload);
+        res.status(500).json({ message: "Internal server error" });
+    }
 });
 
 orderRouter.delete("/", async (req, res) => {
@@ -66,14 +73,21 @@ orderRouter.delete("/", async (req, res) => {
         return res.status(400).json({ message: parsedMarket.message });
     }
 
-    const response = await RedisManager.getInstance().sendAndAwait({
-        type: CANCEL_ORDER,
-        data: {
-            orderId: parsedOrderId.data,
-            market: parsedMarket.data
+    try {
+        const response = await RedisManager.getInstance().sendAndAwait({
+            type: CANCEL_ORDER,
+            data: {
+                orderId: parsedOrderId.data,
+                market: parsedMarket.data
+            }
+        });
+        res.json(response.payload);
+    } catch (error) {
+        if (error instanceof Error && error.message === "Request timed out") {
+            return res.status(504).json({ message: "Engine response timed out" });
         }
-    });
-    res.json(response.payload);
+        res.status(500).json({ message: "Internal server error" });
+    }
 });
 
 orderRouter.get("/open", async (req, res) => {
@@ -186,12 +200,19 @@ orderRouter.get("/balance", async (req, res) => {
         return res.json({ balance: result.rows[0].balance });
     }
 
-    const response = await RedisManager.getInstance().sendAndAwait({
-        type: GET_BALANCE,
-        data: {
-            userId,
-            asset
+    try {
+        const response = await RedisManager.getInstance().sendAndAwait({
+            type: GET_BALANCE,
+            data: {
+                userId,
+                asset
+            }
+        });
+        res.json(response.payload);
+    } catch (error) {
+        if (error instanceof Error && error.message === "Request timed out") {
+            return res.status(504).json({ message: "Engine response timed out" });
         }
-    });
-    res.json(response.payload);
+        res.status(500).json({ message: "Internal server error" });
+    }
 });

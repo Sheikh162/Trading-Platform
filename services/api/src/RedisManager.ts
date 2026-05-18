@@ -50,10 +50,15 @@ export class RedisManager {
   }
 
   public sendAndAwait(message: MessageToEngine) {
-    return new Promise<MessageFromEngine>((resolve) => {
+    return new Promise<MessageFromEngine>((resolve, reject) => {
       const id = this.getRandomClientId();
+      const timeout = setTimeout(() => {
+        this.client.unsubscribe(id);
+        reject(new Error("Request timed out"));
+      }, 5000);
 
       this.client.subscribe(id, (response) => {
+        clearTimeout(timeout);
         this.client.unsubscribe(id);
         resolve(JSON.parse(response));
       });

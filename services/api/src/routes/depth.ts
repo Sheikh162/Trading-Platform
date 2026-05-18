@@ -11,12 +11,19 @@ depthRouter.get("/", async (req, res) => {
         return res.status(400).json({ message: parsedMarket.message });
     }
 
-    const response = await RedisManager.getInstance().sendAndAwait({
-        type: GET_DEPTH,
-        data: {
-            market: parsedMarket.data
-        }
-    });
+    try {
+        const response = await RedisManager.getInstance().sendAndAwait({
+            type: GET_DEPTH,
+            data: {
+                market: parsedMarket.data
+            }
+        });
 
-    res.json(response.payload);
+        res.json(response.payload);
+    } catch (error) {
+        if (error instanceof Error && error.message === "Request timed out") {
+            return res.status(504).json({ message: "Engine response timed out" });
+        }
+        res.status(500).json({ message: "Internal server error" });
+    }
 });

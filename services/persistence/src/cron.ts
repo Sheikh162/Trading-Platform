@@ -66,16 +66,20 @@ async function main() {
         logger.info("Persistence cron health server listening", { port: healthPort });
     });
     
-    refreshTimer = setInterval(() => {
-        refreshViews();
-    }, 1000 * 10);
+    const runRefresh = async () => {
+        if (shuttingDown) return;
+        await refreshViews();
+        refreshTimer = setTimeout(runRefresh, 1000 * 10);
+    };
+
+    runRefresh();
 
     const shutdown = async (signal: string) => {
         shuttingDown = true;
         ready = false;
         logger.info("Shutting down persistence cron", { signal });
         if (refreshTimer) {
-            clearInterval(refreshTimer);
+            clearTimeout(refreshTimer);
         }
         await healthServer.closeAllConnections?.();
         await new Promise<void>((resolve, reject) => {

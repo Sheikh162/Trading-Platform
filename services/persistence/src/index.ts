@@ -21,8 +21,8 @@ async function connectToDatabase() {
   }
 }
 
-async function ensureBalanceRow(userId: string, asset: string) {
-  await pgClient.query(
+async function ensureBalanceRow(client: any, userId: string, asset: string) {
+  await client.query(
     `
       INSERT INTO users (id)
       VALUES ($1)
@@ -30,7 +30,7 @@ async function ensureBalanceRow(userId: string, asset: string) {
     `,
     [userId],
   );
-  await pgClient.query(
+  await client.query(
     `
       INSERT INTO balances (user_id, asset, available, locked)
       VALUES ($1, $2, 0, 0)
@@ -41,13 +41,14 @@ async function ensureBalanceRow(userId: string, asset: string) {
 }
 
 async function mutateBalance(
+  client: any,
   userId: string,
   asset: string,
-  availableDelta: number,
-  lockedDelta: number,
+  availableDelta: string,
+  lockedDelta: string,
 ) {
-  await ensureBalanceRow(userId, asset);
-  const result = await pgClient.query(
+  await ensureBalanceRow(client, userId, asset);
+  const result = await client.query(
     `
       UPDATE balances
       SET
@@ -63,7 +64,7 @@ async function mutateBalance(
   return result.rows[0];
 }
 
-async function insertLedgerEntry(params: {
+async function insertLedgerEntry(client: any, params: {
   userId: string;
   asset: string;
   entryType:
@@ -75,14 +76,14 @@ async function insertLedgerEntry(params: {
     | "withdrawal_debit"
     | "withdrawal_reversal"
     | "fee_debit";
-  amount: number;
+  amount: string;
   balanceAfterAvailable: string;
   balanceAfterLocked: string;
   referenceTable: string;
   referenceId: string;
   details: string;
 }) {
-  await pgClient.query(
+  await client.query(
     `
       INSERT INTO wallet_ledger (
         user_id, asset_symbol, entry_type, amount,
@@ -194,9 +195,7 @@ async function main() {
             timestamp: new Date(tradeData.timestamp).toISOString(),
           });
 
-          const price = parseFloat(tradeData.price);
           const timestamp = new Date(tradeData.timestamp);
-          const volume = parseFloat(tradeData.quantity);
           const market = tradeData.market;
 
           await pgClient.query("BEGIN");
@@ -207,14 +206,7 @@ async function main() {
               tradeData.buyerUserId,
               tradeData.sellerUserId,
             ]) {
-              await pgClient.query(
-                `
-                  INSERT INTO users (id)
-                  VALUES ($1)
-                  ON CONFLICT (id) DO NOTHING
-                `,
-                [userId],
-              );
+              await ensureBalanceRow(pgClient, userId, "USDT"); // ensure at least quote exists
             }
 
             const insertTradeFillResult = await pgClient.query(
@@ -246,53 +238,59 @@ async function main() {
             );
             await pgClient.query(
               "INSERT INTO trades (time, price, volume, currency_code) VALUES ($1, $2, $3, $4)",
-              [timestamp, price, volume, market],
+              [timestamp, tradeData.price, tradeData.quantity, market],
             );
 
             if (insertTradeFillResult.rowCount && insertTradeFillResult.rowCount > 0) {
               const [baseAsset, quoteAsset] = market.split("_");
-              const qty = parseFloat(tradeData.quantity);
-              const quoteQty = parseFloat(tradeData.quoteQuantity);
+              const qty = tradeData.quantity;
+              const negativeQty = (Number(tradeData.quantity) * -1).toString();
+              const quoteQty = tradeData.quoteQuantity;
+              const negativeQuoteQty = (Number(tradeData.quoteQuantity) * -1).toString();
               const buyerIsTaker = tradeData.buyerUserId === tradeData.takerUserId;
 
               if (buyerIsTaker) {
                 const takerQuote = await mutateBalance(
+                  pgClient,
                   tradeData.takerUserId,
                   quoteAsset,
-                  0,
-                  -quoteQty,
+                  negativeQuoteQty,
+                  "0",
                 );
                 const takerBase = await mutateBalance(
+                  pgClient,
                   tradeData.takerUserId,
                   baseAsset,
                   qty,
-                  0,
+                  "0",
                 );
                 const makerBase = await mutateBalance(
+                  pgClient,
                   tradeData.makerUserId,
                   baseAsset,
-                  0,
-                  -qty,
+                  "0",
+                  negativeQty,
                 );
                 const makerQuote = await mutateBalance(
+                  pgClient,
                   tradeData.makerUserId,
                   quoteAsset,
                   quoteQty,
-                  0,
+                  "0",
                 );
 
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: tradeData.takerUserId,
                   asset: quoteAsset,
                   entryType: "trade_debit",
-                  amount: -quoteQty,
+                  amount: negativeQuoteQty,
                   balanceAfterAvailable: takerQuote.available,
                   balanceAfterLocked: takerQuote.locked,
                   referenceTable: "trade_fills",
                   referenceId: tradeData.id,
                   details: `Bought ${qty} ${baseAsset}`,
                 });
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: tradeData.takerUserId,
                   asset: baseAsset,
                   entryType: "trade_credit",
@@ -303,18 +301,18 @@ async function main() {
                   referenceId: tradeData.id,
                   details: `Bought ${qty} ${baseAsset}`,
                 });
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: tradeData.makerUserId,
                   asset: baseAsset,
                   entryType: "trade_debit",
-                  amount: -qty,
+                  amount: negativeQty,
                   balanceAfterAvailable: makerBase.available,
                   balanceAfterLocked: makerBase.locked,
                   referenceTable: "trade_fills",
                   referenceId: tradeData.id,
                   details: `Sold ${qty} ${baseAsset}`,
                 });
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: tradeData.makerUserId,
                   asset: quoteAsset,
                   entryType: "trade_credit",
@@ -327,42 +325,46 @@ async function main() {
                 });
               } else {
                 const takerBase = await mutateBalance(
+                  pgClient,
                   tradeData.takerUserId,
                   baseAsset,
-                  0,
-                  -qty,
+                  negativeQty,
+                  "0",
                 );
                 const takerQuote = await mutateBalance(
+                  pgClient,
                   tradeData.takerUserId,
                   quoteAsset,
                   quoteQty,
-                  0,
+                  "0",
                 );
                 const makerQuote = await mutateBalance(
+                  pgClient,
                   tradeData.makerUserId,
                   quoteAsset,
-                  0,
-                  -quoteQty,
+                  "0",
+                  negativeQuoteQty,
                 );
                 const makerBase = await mutateBalance(
+                  pgClient,
                   tradeData.makerUserId,
                   baseAsset,
                   qty,
-                  0,
+                  "0",
                 );
 
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: tradeData.takerUserId,
                   asset: baseAsset,
                   entryType: "trade_debit",
-                  amount: -qty,
+                  amount: negativeQty,
                   balanceAfterAvailable: takerBase.available,
                   balanceAfterLocked: takerBase.locked,
                   referenceTable: "trade_fills",
                   referenceId: tradeData.id,
                   details: `Sold ${qty} ${baseAsset}`,
                 });
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: tradeData.takerUserId,
                   asset: quoteAsset,
                   entryType: "trade_credit",
@@ -373,18 +375,18 @@ async function main() {
                   referenceId: tradeData.id,
                   details: `Sold ${qty} ${baseAsset}`,
                 });
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: tradeData.makerUserId,
                   asset: quoteAsset,
                   entryType: "trade_debit",
-                  amount: -quoteQty,
+                  amount: negativeQuoteQty,
                   balanceAfterAvailable: makerQuote.available,
                   balanceAfterLocked: makerQuote.locked,
                   referenceTable: "trade_fills",
                   referenceId: tradeData.id,
                   details: `Bought ${qty} ${baseAsset}`,
                 });
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: tradeData.makerUserId,
                   asset: baseAsset,
                   entryType: "trade_credit",
@@ -420,10 +422,10 @@ async function main() {
               `SELECT id FROM orders WHERE id = $1`,
               [orderData.orderId],
             );
-            const initialFilled = orderData.executedQty ?? 0;
+            const initialFilled = orderData.executedQty ?? "0";
             const status =
               orderData.status ??
-              (initialFilled === 0
+              (initialFilled === "0"
                 ? "open"
                 : Number(orderData.quantity) <= Number(initialFilled)
                   ? "filled"
@@ -457,28 +459,22 @@ async function main() {
             );
 
             if (existingOrder.rows.length === 0) {
-              await pgClient.query(
-                `
-                  INSERT INTO users (id)
-                  VALUES ($1)
-                  ON CONFLICT (id) DO NOTHING
-                `,
-                [orderData.userId],
-              );
               const [baseAsset, quoteAsset] = orderData.market.split("_");
               if (orderData.side === "buy") {
-                const totalQuote = Number(orderData.price) * Number(orderData.quantity);
+                const totalQuote = (Number(orderData.price) * Number(orderData.quantity)).toString();
+                const negativeTotalQuote = (Number(totalQuote) * -1).toString();
                 const updatedBalance = await mutateBalance(
+                  pgClient,
                   orderData.userId,
                   quoteAsset,
-                  -totalQuote,
+                  negativeTotalQuote,
                   totalQuote,
                 );
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: orderData.userId,
                   asset: quoteAsset,
                   entryType: "order_lock",
-                  amount: -totalQuote,
+                  amount: negativeTotalQuote,
                   balanceAfterAvailable: updatedBalance.available,
                   balanceAfterLocked: updatedBalance.locked,
                   referenceTable: "orders",
@@ -486,18 +482,20 @@ async function main() {
                   details: `Locked funds for ${orderData.market} buy order`,
                 });
               } else {
-                const quantity = Number(orderData.quantity);
+                const quantity = orderData.quantity;
+                const negativeQuantity = (Number(quantity) * -1).toString();
                 const updatedBalance = await mutateBalance(
+                  pgClient,
                   orderData.userId,
                   baseAsset,
-                  -quantity,
+                  negativeQuantity,
                   quantity,
                 );
-                await insertLedgerEntry({
+                await insertLedgerEntry(pgClient, {
                   userId: orderData.userId,
                   asset: baseAsset,
                   entryType: "order_lock",
-                  amount: -quantity,
+                  amount: negativeQuantity,
                   balanceAfterAvailable: updatedBalance.available,
                   balanceAfterLocked: updatedBalance.locked,
                   referenceTable: "orders",
@@ -527,19 +525,24 @@ async function main() {
             if (orderResult.rows.length > 0 && orderResult.rows[0].status !== "cancelled") {
               const existingOrder = orderResult.rows[0];
               const [baseAsset, quoteAsset] = existingOrder.market_symbol.split("_");
-              const remainingQty =
+              const remainingQtyNum =
                 Number(existingOrder.quantity) - Number(existingOrder.filled_quantity);
 
-              if (remainingQty > 0) {
+              if (remainingQtyNum > 0) {
+                const remainingQty = remainingQtyNum.toString();
+                const negativeRemainingQty = (remainingQtyNum * -1).toString();
                 if (existingOrder.side === "buy") {
-                  const refund = remainingQty * Number(existingOrder.price);
+                  const refundNum = remainingQtyNum * Number(existingOrder.price);
+                  const refund = refundNum.toString();
+                  const negativeRefund = (refundNum * -1).toString();
                   const balance = await mutateBalance(
+                    pgClient,
                     existingOrder.user_id,
                     quoteAsset,
                     refund,
-                    -refund,
+                    negativeRefund,
                   );
-                  await insertLedgerEntry({
+                  await insertLedgerEntry(pgClient, {
                     userId: existingOrder.user_id,
                     asset: quoteAsset,
                     entryType: "order_unlock",
@@ -552,12 +555,13 @@ async function main() {
                   });
                 } else {
                   const balance = await mutateBalance(
+                    pgClient,
                     existingOrder.user_id,
                     baseAsset,
                     remainingQty,
-                    -remainingQty,
+                    negativeRemainingQty,
                   );
-                  await insertLedgerEntry({
+                  await insertLedgerEntry(pgClient, {
                     userId: existingOrder.user_id,
                     asset: baseAsset,
                     entryType: "order_unlock",
@@ -580,7 +584,7 @@ async function main() {
               `,
               [orderData.orderId],
             );
-          } else if (typeof orderData.executedQty === "number") {
+          } else if (orderData.executedQty) {
             await pgClient.query(
               `
                 UPDATE orders

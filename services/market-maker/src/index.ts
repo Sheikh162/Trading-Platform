@@ -16,11 +16,13 @@ type PlaceOrderResponse = {
 };
 
 const BASE_URL = process.env.API_BASE_URL;
-const TOTAL_BIDS = 20;
-const TOTAL_ASK = 20;
+const TOTAL_BIDS = 15;
+const TOTAL_ASK = 15;
 const MARKET = "BTC_USDT";
 const BUY_USER_ID = "2";
 const SELL_USER_ID = "5";
+const PAINTER_USER_ID = "1"; // User for intentional trades
+
 let isApiReady = false;
 let shuttingDown = false;
 
@@ -34,7 +36,6 @@ const apiClient = axios.create({
 async function waitForApi() {
   while (!shuttingDown) {
     try {
-      //await axios.get(`${BASE_URL}/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`)
       await apiClient.get(`/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`)
       isApiReady = true;
       logger.info("API is reachable");
@@ -47,135 +48,90 @@ async function waitForApi() {
 }
 
 async function main() {
-    if (shuttingDown) {
-        return;
-    }
-    if(!isApiReady) await waitForApi();
-    const price = 1000 + Math.random() * 10;
-    
-    // Fetch open orders for BOTH bots independently so it doesn't leak memory or hallucinate empty asks
-    const openBidsResponse = await apiClient.get(`/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`);
-    const openAsksResponse = await apiClient.get(`/api/v1/order/open?userId=${SELL_USER_ID}&market=${MARKET}`);
-    
-    const openBidsData = (openBidsResponse.data || []) as OpenOrder[];
-    const openAsksData = (openAsksResponse.data || []) as OpenOrder[];
+    if (shuttingDown) return;
+    if (!isApiReady) await waitForApi();
 
-    if (!Array.isArray(openBidsData) || !Array.isArray(openAsksData)) {
-        logger.error("Failed to fetch valid open orders", { baseUrl: BASE_URL });
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return main();
-    }
+    try {
+        const targetPrice = 1000 + Math.random() * 10;
+        
+        // 1. Fetch all open orders in parallel
+        const [openBidsRes, openAsksResponse] = await Promise.all([
+            apiClient.get(`/api/v1/order/open?userId=${BUY_USER_ID}&market=${MARKET}`),
+            apiClient.get(`/api/v1/order/open?userId=${SELL_USER_ID}&market=${MARKET}`)
+        ]);
+        
+        const openBidsData = (openBidsRes.data || []) as OpenOrder[];
+        const openAsksData = (openAsksResponse.data || []) as OpenOrder[];
 
-    const totalBids = openBidsData.length;
-    const totalAsks = openAsksData.length;
+        logger.info("Market maker cycle start", {
+            market: MARKET,
+            targetPrice: targetPrice.toFixed(2),
+            openBids: openBidsData.length,
+            openAsks: openAsksData.length,
+        });
 
-    logger.info("Market maker cycle start", {
-        market: MARKET,
-        targetPrice: price.toFixed(2),
-        openBids: totalBids,
-        openAsks: totalAsks,
-    });
+        // 2. Parallelize cancellations
+        const cancelPromises: Promise<any>[] = [];
+        
+        // Cancel bids too high
+        openBidsData.forEach(o => {
+            if (Number(o.price) > targetPrice || Math.random() < 0.3) {
+                cancelPromises.push(apiClient.delete(`/api/v1/order`, { data: { orderId: o.id, market: MARKET } }));
+            }
+        });
 
-    const cancelledBids = await cancelBidsMoreThan(openBidsData, price);
-    const cancelledAsks = await cancelAsksLessThan(openAsksData, price);
-    
-    let bidsToAdd = TOTAL_BIDS - (totalBids - cancelledBids);
-    let asksToAdd = TOTAL_ASK - (totalAsks - cancelledAsks);
+        // Cancel asks too low
+        openAsksData.forEach(o => {
+            if (Number(o.price) < targetPrice || Math.random() < 0.3) {
+                cancelPromises.push(apiClient.delete(`/api/v1/order`, { data: { orderId: o.id, market: MARKET } }));
+            }
+        });
 
-    logger.info("Market maker cycle summary", {
-        cancelledBids,
-        cancelledAsks,
-        bidsToAdd,
-        asksToAdd,
-    });
+        await Promise.allSettled(cancelPromises);
 
-    while(bidsToAdd > 0 || asksToAdd > 0) {
-        if (bidsToAdd > 0) {
-            const bidPrice = (price - Math.random() * 1).toFixed(1).toString();
-            const response = await apiClient.post<PlaceOrderResponse>(`/api/v1/order`, {
-                market: MARKET,
-                price: bidPrice,
-                quantity: "1",
-                side: "buy",
-                userId: BUY_USER_ID
-            });
-            logger.info("Placed buy order", {
-                userId: BUY_USER_ID,
-                price: bidPrice,
-                orderId: response.data?.orderId ?? "unknown",
-            });
-            bidsToAdd--;
+        // 3. Parallelize new order placement
+        const orderPromises: Promise<any>[] = [];
+        let bidsToAdd = TOTAL_BIDS - (openBidsData.length - cancelPromises.filter((_, i) => i < openBidsData.length).length);
+        let asksToAdd = TOTAL_ASK - (openAsksData.length - cancelPromises.filter((_, i) => i >= openBidsData.length).length);
+
+        for (let i = 0; i < bidsToAdd; i++) {
+            const bidPrice = (targetPrice - Math.random() * 5).toFixed(1);
+            orderPromises.push(apiClient.post(`/api/v1/order`, {
+                market: MARKET, price: bidPrice, quantity: "1", side: "buy", userId: BUY_USER_ID
+            }));
         }
-        if (asksToAdd > 0) {
-            const askPrice = (price + Math.random() * 1).toFixed(1).toString();
-            const response = await apiClient.post<PlaceOrderResponse>(`/api/v1/order`, {
-                market: MARKET,
-                price: askPrice,
-                quantity: "1",
-                side: "sell",
-                userId: SELL_USER_ID
-            });
-            logger.info("Placed sell order", {
-                userId: SELL_USER_ID,
-                price: askPrice,
-                orderId: response.data?.orderId ?? "unknown",
-            });
-            asksToAdd--;
+
+        for (let i = 0; i < asksToAdd; i++) {
+            const askPrice = (targetPrice + Math.random() * 5).toFixed(1);
+            orderPromises.push(apiClient.post(`/api/v1/order`, {
+                market: MARKET, price: askPrice, quantity: "1", side: "sell", userId: SELL_USER_ID
+            }));
         }
+
+        // 4. THE PAINTER LOGIC: Intentionally cross the spread to generate candles
+        if (Math.random() < 0.7) { // 70% chance to paint every cycle
+            const side = Math.random() > 0.5 ? "buy" : "sell";
+            const paintPrice = side === "buy" ? (targetPrice + 0.1).toFixed(1) : (targetPrice - 0.1).toFixed(1);
+            
+            logger.info("🎨 Painting chart trade", { side, price: paintPrice });
+            orderPromises.push(apiClient.post(`/api/v1/order`, {
+                market: MARKET,
+                price: paintPrice,
+                quantity: "1",
+                side: side,
+                userId: PAINTER_USER_ID
+            }));
+        }
+
+        await Promise.allSettled(orderPromises);
+        logger.info("Market maker cycle complete", { placed: orderPromises.length, cancelled: cancelPromises.length });
+
+    } catch (error) {
+        logger.error("Market maker cycle failed", error);
     }
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
+    await new Promise(resolve => setTimeout(resolve, 500)); // Fast cycles: 500ms
     main();
-}
-
-async function cancelBidsMoreThan(openOrders: OpenOrder[], price: number) {
-    const promises: Promise<unknown>[] = [];
-    openOrders.forEach((o) => {
-        if (!o?.id) {
-            logger.warn("Skipping malformed buy order payload", o);
-            return;
-        }
-        if (o.side === "buy" && (Number(o.price) > price || Math.random() < 0.5)) {
-            logger.info("Cancelling buy order", { orderId: o.id, price: o.price });
-            promises.push(apiClient.delete(`/api/v1/order`, {
-                data: {
-                    orderId: o.id,
-                    market: MARKET
-                }
-            }).catch(e => {
-                // Ignore errors from cancellations (likely already filled/removed)
-                logger.debug("Failed to cancel buy order", { id: o.id });
-            }));
-        }
-    });
-    await Promise.all(promises);
-    return promises.length;
-}
-
-async function cancelAsksLessThan(openOrders: OpenOrder[], price: number) {
-    const promises: Promise<unknown>[] = [];
-    openOrders.forEach((o) => {
-        if (!o?.id) {
-            logger.warn("Skipping malformed sell order payload", o);
-            return;
-        }
-        if (o.side === "sell" && (Number(o.price) < price || Math.random() < 0.5)) {
-            logger.info("Cancelling sell order", { orderId: o.id, price: o.price });
-            promises.push(apiClient.delete(`/api/v1/order`, {
-                data: {
-                    orderId: o.id,
-                    market: MARKET
-                }
-            }).catch(e => {
-                // Ignore errors from cancellations (likely already filled/removed)
-                logger.debug("Failed to cancel buy order", { id: o.id });
-            }));
-        }
-    });
-
-    await Promise.all(promises);
-    return promises.length;
 }
 
 const healthPort = Number(process.env.HEALTH_PORT || 8085);
@@ -185,13 +141,9 @@ const healthServer = http.createServer((req, res) => {
         res.end();
         return;
     }
-
     const statusCode = isApiReady && !shuttingDown ? 200 : 503;
     res.writeHead(statusCode, { "content-type": "application/json" });
-    res.end(JSON.stringify({
-        status: statusCode === 200 ? "ok" : "error",
-        service: "market-maker",
-    }));
+    res.end(JSON.stringify({ status: statusCode === 200 ? "ok" : "error", service: "market-maker" }));
 });
 
 healthServer.listen(healthPort, () => {
@@ -203,86 +155,11 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
         shuttingDown = true;
         logger.info("Shutting down market maker", { signal });
         healthServer.closeAllConnections?.();
-        healthServer.close(() => {
-            process.exit(0);
-        });
+        healthServer.close(() => process.exit(0));
     });
 }
 
 main().catch((error) => {
-    logger.error("Market maker failed", error);
+    logger.error("Market maker fatal failure", error);
     process.exit(1);
 });
-
-//     try {
-//         // Add a small random jitter so Open != Close
-//         // This ensures the candle has a tiny "body" instead of being a flat line
-//         const jitter = (Math.random() - 0.5) * 2; // Random swing between -1 and +1 dollar
-//         const executionPrice = (currentPrice + jitter).toFixed(2);
-
-//         // We still cross the spread to ensure fill, but we log the 'jittered' price
-//         // Note: In a real matching engine, the execution price is determined by the Maker order.
-//         // To make the chart look "wiggly", we need the Liquidity Walls to move slightly too.
-        
-//         // For now, simply forcing the trade more often will fill the chart.
-//         const aggressivePrice = (currentPrice * (1 + SPREAD + 0.001)).toFixed(2);
-
-//         await apiClient.post(`/api/v1/order`, {
-//             market: MARKET,
-//             price: aggressivePrice, 
-//             quantity: "1",
-//             side: "buy",
-//             userId: PAINTER_USER_ID, 
-//         });
-        
-//         lastPaintedPrice = currentPrice;
-//         console.log(`🎨 Chart Painted!`);
-//     } catch (e) {
-//         console.log("Paint failed", e);
-//     }
-// }
-
-// // Add this helper function to mm/src/index.ts
-
-// function testBinanceConnection(): Promise<void> {
-//     return new Promise((resolve, reject) => {
-//         console.log("🔍 Testing Binance Connection...");
-        
-//         const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-//         let messageCount = 0;
-
-//         ws.on('open', () => {
-//             console.log('✅ Connected to Binance WebSocket!');
-//         });
-
-//         ws.on('message', (data: any) => {
-//             const trade = JSON.parse(data.toString());
-//             const price = parseFloat(trade.p).toFixed(2);
-//             const time = new Date(trade.T).toLocaleTimeString();
-            
-//             console.log(`[Stream Test] BTC Price: $${price} at ${time}`);
-            
-//             messageCount++;
-            
-//             // Stop testing after 5 messages so we can proceed
-//             if (messageCount >= 5) {
-//                 console.log("✅ Stream is working perfectly. Starting Bot...");
-//                 ws.terminate(); // Close this test connection
-//                 resolve();
-//             }
-//         });
-
-//         ws.on('error', (err) => {
-//             console.error('❌ WebSocket Error:', err);
-//             reject(err);
-//         });
-//     });
-// }
-
-// async function main() {
-//     connectToBinance();
-//     setInterval(syncLiquidity, 1000); 
-//     setInterval(paintChart, PAINTER_INTERVAL);
-// }
-
-// main();

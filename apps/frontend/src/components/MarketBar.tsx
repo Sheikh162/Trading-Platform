@@ -12,47 +12,52 @@ export const MarketBar = ({ market, initialTicker }: { market: string; initialTi
     const [ticker, setTicker] = useState<Ticker | null>(initialTicker || null);
 
     useEffect(() => {
-        //getTicker(market).then(setTicker);
+        // Use the initialTicker if provided, to ensure we don't start with null if data is available
+        if (initialTicker) {
+            setTicker(initialTicker);
+        }
+
         const tickerCallback = (data: Partial<Ticker>) => {
-            setTicker(prevTicker => ({
-                // Ensure prevTicker is not null before spreading
-                ...(prevTicker || {}),
-                ...data,
-                // Provide default empty strings for all Ticker properties
-                firstPrice: data?.firstPrice ?? prevTicker?.firstPrice ?? '',
-                high: data?.high ?? prevTicker?.high ?? '',
-                lastPrice: data?.lastPrice ?? prevTicker?.lastPrice ?? '',
-                low: data?.low ?? prevTicker?.low ?? '',
-                priceChange: data?.priceChange ?? prevTicker?.priceChange ?? '',
-                priceChangePercent: data?.priceChangePercent ?? prevTicker?.priceChangePercent ?? '',
-                quoteVolume: data?.quoteVolume ?? prevTicker?.quoteVolume ?? '',
-                symbol: data?.symbol ?? prevTicker?.symbol ?? '',
-                trades: data?.trades ?? prevTicker?.trades ?? '',
-                volume: data?.volume ?? prevTicker?.volume ?? '',
-            }));
+            setTicker(prevTicker => {
+                const updatedTicker = {
+                    ...(prevTicker || {}),
+                    ...data,
+                } as Ticker;
+                
+                // Ensure all required fields have at least a '0.00' default if they are missing
+                return {
+                    ...updatedTicker,
+                    firstPrice: updatedTicker.firstPrice ?? '0.00',
+                    high: updatedTicker.high ?? '0.00',
+                    lastPrice: updatedTicker.lastPrice ?? '0.00',
+                    low: updatedTicker.low ?? '0.00',
+                    priceChange: updatedTicker.priceChange ?? '0.00',
+                    priceChangePercent: updatedTicker.priceChangePercent ?? '0.00',
+                    quoteVolume: updatedTicker.quoteVolume ?? '0.00',
+                    symbol: updatedTicker.symbol ?? market,
+                    trades: updatedTicker.trades ?? '0',
+                    volume: updatedTicker.volume ?? '0.00',
+                };
+            });
         };
 
         SignalingManager.getInstance().registerCallback("ticker", tickerCallback, `TICKER-${market}`);
-        SignalingManager.getInstance().sendMessage({ "method": "SUBSCRIBE", "params": [`ticker@${market}`] }); // change to @
-
-        //SignalingManager.getInstance().registerCallback("depth", depthCallback, `DEPTH-${market}`);
-        //SignalingManager.getInstance().sendMessage({ "method": "SUBSCRIBE", "params": [`depth@${market}`] });
+        SignalingManager.getInstance().sendMessage({ "method": "SUBSCRIBE", "params": [`ticker@${market}`] });
 
         return () => {
             SignalingManager.getInstance().deRegisterCallback("ticker", `TICKER-${market}`);
             SignalingManager.getInstance().sendMessage({ "method": "UNSUBSCRIBE", "params": [`ticker@${market}`] });
         }
-    }, [market]);
+    }, [market, initialTicker]);
 
     const priceChange = parseFloat(ticker?.priceChange ?? '0');
     const priceChangePercent = parseFloat(ticker?.priceChangePercent ?? '0');
 
     const marketStats = [
-        { label: "Last Price", value: `$${ticker?.lastPrice}`, className: "white"  /* className: priceChange > 0 ? "text-green-500" : "text-red-500"  */ },
-/*         { label: "24h Change", value: `${priceChange > 0 ? '+' : ''}${ticker?.priceChange} (${priceChangePercent.toFixed(2)}%)`, className: priceChange > 0 ? "text-green-500" : "text-red-500" },
- */        { label: "24h High", value: ticker?.high },
-        { label: "24h Low", value: ticker?.low },
-        { label: "24h Volume", value: ticker?.volume },
+        { label: "Last Price", value: `$${ticker?.lastPrice ?? '0.00'}`, className: "white" },
+        { label: "24h High", value: ticker?.high ?? '0.00' },
+        { label: "24h Low", value: ticker?.low ?? '0.00' },
+        { label: "24h Volume", value: ticker?.volume ?? '0.00' },
     ];
 
     return (

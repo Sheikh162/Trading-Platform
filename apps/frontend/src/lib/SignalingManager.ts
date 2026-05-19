@@ -73,14 +73,18 @@ export class SignalingManager {
     }
 
     private resubscribeAll() {
-        // Extract unique market IDs from registered callbacks to resubscribe
+        // Extract unique market names from registered callbacks to resubscribe
         const activeSubscriptions = new Set<string>();
         
         Object.keys(this.callbacks).forEach(type => {
             this.callbacks[type].forEach(({ id }: callbackType) => {
-                 if (type === "ticker") activeSubscriptions.add(`ticker@${id}`);
-                 if (type === "depth") activeSubscriptions.add(`depth@${id}`);
-                 if (type === "trade") activeSubscriptions.add(`trade@${id}`);
+                 // The 'id' passed from components is e.g. "TICKER-BTC_USDT" or "DEPTH-BTC_USDT"
+                 // We need to extract the actual market name "BTC_USDT"
+                 const market = id.split("-")[1] || id;
+                 
+                 if (type === "ticker") activeSubscriptions.add(`ticker@${market}`);
+                 if (type === "depth") activeSubscriptions.add(`depth@${market}`);
+                 if (type === "trade") activeSubscriptions.add(`trade@${market}`);
             });
         });
 
@@ -116,13 +120,14 @@ export class SignalingManager {
 
         this.ws.onerror = (error) => {
             console.error("WebSocket error observed:", error);
-            // close will follow error
         };
 
         this.ws.onmessage = (event) => {
             try {
                 const message:any = JSON.parse(event.data);
-                const type = message.data?.e; // ticker, depth etc
+                if (!message.data) return; // Safety check
+
+                const type = message.data.e; // ticker, depth etc
                 if (type && this.callbacks[type]) { 
                     this.callbacks[type].forEach(({ callback }:callbackType) => {
                         if (type === "ticker") {

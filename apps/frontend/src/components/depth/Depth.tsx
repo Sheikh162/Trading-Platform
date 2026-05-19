@@ -15,8 +15,8 @@ const PRICE_ROW_HEIGHT = 28;
 const DEPTH_VIEWPORT_HEIGHT = (VISIBLE_ROWS_PER_SIDE * ROW_HEIGHT * 2) + PRICE_ROW_HEIGHT + 8;
 
 export function Depth({ market, initialBids, initialAsks }: { market: string, initialBids?: [string, string][], initialAsks?: [string, string][] }) {
-    const [bids, setBids] = useState<[string, string][] | undefined>(initialBids);
-    const [asks, setAsks] = useState<[string, string][] | undefined>(initialAsks);
+    const [bids, setBids] = useState<[string, string][]>(initialBids || []);
+    const [asks, setAsks] = useState<[string, string][]>(initialAsks || []);
     const [ticker, setTicker] = useState<Ticker | null>(null);
 
     // Create refs for the scrollable container and the price element
@@ -32,7 +32,7 @@ export function Depth({ market, initialBids, initialAsks }: { market: string, in
             const viewport = scrollContainerRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
             const priceElement = priceRef.current;
 
-            if (viewport && (asks || bids)) { // Check that we've received at least some data state before sealing the center
+            if (viewport && (asks.length > 0 || bids.length > 0)) { // Check that we've received at least some data state before sealing the center
                 const scrollPosition = priceElement.offsetTop - (viewport.clientHeight / 2) + (priceElement.clientHeight / 2);
                 viewport.scrollTop = scrollPosition;
                 hasInitialCentered.current = true;
@@ -73,9 +73,13 @@ export function Depth({ market, initialBids, initialAsks }: { market: string, in
     };
 
     useEffect(() => {
+        // Sync with initial data if it changes
+        if (initialBids) setBids(initialBids);
+        if (initialAsks) setAsks(initialAsks);
+
         const depthCallback = (data: { bids: [string, string][], asks: [string, string][] }) => {
             setAsks(prevAsks => {
-                const newAsksMap = new Map(prevAsks);
+                const newAsksMap = new Map(prevAsks || []);
                 data.asks.forEach(([price, amount]) => {
                     if (amount === "0") newAsksMap.delete(price);
                     else newAsksMap.set(price, amount);
@@ -84,7 +88,7 @@ export function Depth({ market, initialBids, initialAsks }: { market: string, in
             });
 
             setBids(prevBids => {
-                const newBidsMap = new Map(prevBids);
+                const newBidsMap = new Map(prevBids || []);
                 data.bids.forEach(([price, amount]) => {
                     if (amount === "0") newBidsMap.delete(price);
                     else newBidsMap.set(price, amount);
@@ -100,26 +104,15 @@ export function Depth({ market, initialBids, initialAsks }: { market: string, in
             SignalingManager.getInstance().sendMessage({ "method": "UNSUBSCRIBE", "params": [`depth@${market}`] });
             SignalingManager.getInstance().deRegisterCallback("depth", `DEPTH-${market}`);
         }
-    }, [market]);
+    }, [market, initialBids, initialAsks]);
 
     useEffect(() => {
         const tickerCallback = (data: Partial<Ticker>) => {
             setTicker(prevTicker => ({
-                // Ensure prevTicker is not null before spreading
                 ...(prevTicker || {}),
                 ...data,
-                // Provide default empty strings for all Ticker properties
-                firstPrice: data?.firstPrice ?? prevTicker?.firstPrice ?? '',
-                high: data?.high ?? prevTicker?.high ?? '',
-                lastPrice: data?.lastPrice ?? prevTicker?.lastPrice ?? '',
-                low: data?.low ?? prevTicker?.low ?? '',
-                priceChange: data?.priceChange ?? prevTicker?.priceChange ?? '',
-                priceChangePercent: data?.priceChangePercent ?? prevTicker?.priceChangePercent ?? '',
-                quoteVolume: data?.quoteVolume ?? prevTicker?.quoteVolume ?? '',
-                symbol: data?.symbol ?? prevTicker?.symbol ?? '',
-                trades: data?.trades ?? prevTicker?.trades ?? '',
-                volume: data?.volume ?? prevTicker?.volume ?? '',
-            }));
+                lastPrice: data?.lastPrice ?? prevTicker?.lastPrice ?? '0.00',
+            } as Ticker));
         };
 
         SignalingManager.getInstance().registerCallback("ticker", tickerCallback, `TICKER-${market}`);
@@ -141,11 +134,11 @@ export function Depth({ market, initialBids, initialAsks }: { market: string, in
                         style={{ minHeight: `${DEPTH_VIEWPORT_HEIGHT}px` }}
                     >
                         <Total ref={scrollContainerRef}>
-                            <AskTable asks={asks || []} />
+                            <AskTable asks={asks} />
                             <div ref={priceRef} className="text-lg h-[28px] flex items-center justify-center font-medium tabular-nums tracking-[-0.02em] font-mono text-center my-1 text-[var(--color-up)]">
-                                {ticker?.lastPrice ? ticker.lastPrice : '---'}
+                                {ticker?.lastPrice && ticker.lastPrice !== '0.00' ? ticker.lastPrice : '---'}
                             </div>
-                            <BidTable bids={bids || []} />
+                            <BidTable bids={bids} />
                         </Total>
                     </div>
                     

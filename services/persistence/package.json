@@ -9,8 +9,8 @@
     "start": "node dist/index.js",
     "dev": "pnpm run build && pnpm exec concurrently --kill-others --names tsc,worker,cron \"pnpm run dev:build\" \"pnpm run dev:worker\" \"pnpm run dev:cron\"",
     "dev:build": "tsc -w --preserveWatchOutput",
-    "dev:worker": "node --watch dist/index.js",
-    "dev:cron": "node --watch dist/cron.js",
+    "dev:worker": "HEALTH_PORT=8083 node --watch dist/index.js",
+    "dev:cron": "HEALTH_PORT=8084 node --watch dist/cron.js",
     "db:seed": "node dist/seed-db.js",
     "refresh:views": "node dist/cron.js"
   },

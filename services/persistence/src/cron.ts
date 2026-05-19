@@ -1,3 +1,4 @@
+import "dotenv/config"
 import { Client } from 'pg'; 
 import http from "node:http";
 import { getPostgresConfig } from "@trading-platform/config";

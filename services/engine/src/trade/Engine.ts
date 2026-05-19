@@ -645,7 +645,7 @@ export class Engine {
                     if (makerBalance[baseAsset]) makerBalance[baseAsset].available += baseAmount;
 
                     // Update taker
-                    if (takerBalance[quoteAsset]) takerBalance[takerBalance[quoteAsset] ? quoteAsset : BASE_CURRENCY].available += quoteAmount;
+                    if (takerBalance[quoteAsset]) takerBalance[quoteAsset].available += quoteAmount;
                     if (takerBalance[baseAsset]) takerBalance[baseAsset].locked -= baseAmount;
                 }
             });

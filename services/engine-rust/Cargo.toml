@@ -1,0 +1,26 @@
+[package]
+name = "engine-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+# JSON serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Redis client
+redis = { version = "0.24", features = ["tokio-comp"] }
+# Postgres database connection and queries
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "chrono"] }
+# Chrono for date times
+chrono = { version = "0.4", features = ["serde"] }
+# Custom error helpers
+thiserror = "1"
+# Random generator for order IDs
+rand = "0.8"
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# HTTP health check framework
+axum = "0.7"

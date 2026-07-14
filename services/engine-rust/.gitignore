@@ -1,0 +1,6 @@
+# Rust compilation outputs
+target
+
+# Local state snapshots
+snapshot.json
+*.log
